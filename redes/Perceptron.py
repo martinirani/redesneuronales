@@ -80,7 +80,7 @@ x = np.random.rand(50, 1)
 y = np.random.rand(50, 1)
 train_num = 50
 b = 1
-learningrate = 0.01
+learningrate = 0.05
 
 LearningPerceptron(x, y, b, learningrate, train_num).draw()
 
