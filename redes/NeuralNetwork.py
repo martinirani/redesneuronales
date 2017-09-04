@@ -5,30 +5,61 @@ class NeuralNetwork:
     def __init__(self, numberOfInputs, numberOfNeuronsInHiddenLayer, numberOfOutputs):
         self.numberOfInputs = numberOfInputs
         self.numberOfNeuronsInHiddenLayer = numberOfNeuronsInHiddenLayer
+        self.numberOfHiddenLayers = len(self.numberOfNeuronsInHiddenLayer)
         self.numberOfOutputs = numberOfOutputs
-        self.hiddenLayer = NeuronLayer(numberOfInputs, numberOfNeuronsInHiddenLayer)
-        self.outputLayer = NeuronLayer(numberOfNeuronsInHiddenLayer, numberOfOutputs)
-        self.hiddenLayer.nextLayer(self.outputLayer)
-        self.outputLayer.nextLayer(None)
-        self.outputLayer.previousLayer(self.hiddenLayer)
-        self.hiddenLayer.previousLayer(None)
+        self.hiddenLayer = [None] * len(self.numberOfNeuronsInHiddenLayer)
+        print self.hiddenLayer
+
+    def createNetwork(self):
+
+        if self.numberOfHiddenLayers is 1:
+
+            self.hiddenLayer[0] = NeuronLayer(self.numberOfInputs, self.numberOfNeuronsInHiddenLayer[0])
+            self.outputLayer = NeuronLayer(self.numberOfNeuronsInHiddenLayer[0], self.numberOfOutputs)
+            self.hiddenLayer[0].nextLayer(self.outputLayer)
+            self.outputLayer.nextLayer(None)
+            self.outputLayer.previousLayer(self.hiddenLayer[0])
+            self.hiddenLayer[0].previousLayer(None)
+
+        else:
+            for L in range(self.numberOfHiddenLayers):
+                if L is 0:
+                    self.hiddenLayer[L] = NeuronLayer(self.numberOfInputs, self.numberOfNeuronsInHiddenLayer[L])
+                elif 0 < L <= self.numberOfHiddenLayers-1:
+                    self.hiddenLayer[L] = NeuronLayer(self.numberOfNeuronsInHiddenLayer[L-1], self.numberOfNeuronsInHiddenLayer[L])
+            print self.hiddenLayer
+            self.outputLayer = NeuronLayer(self.numberOfNeuronsInHiddenLayer[self.numberOfHiddenLayers-1], self.numberOfOutputs)
+
+            for L in range(self.numberOfHiddenLayers):
+                if L is 0:
+                    self.hiddenLayer[L].nextLayer(self.hiddenLayer[L + 1])
+                    self.hiddenLayer[L].previousLayer(None)
+                elif 0 < L < self.numberOfHiddenLayers - 1:
+                    self.hiddenLayer[L].nextLayer(self.hiddenLayer[L + 1])
+                    self.hiddenLayer[L].previousLayer(self.hiddenLayer[L - 1])
+                elif L is self.numberOfHiddenLayers - 1:
+                    self.hiddenLayer[L].previousLayer(self.hiddenLayer[L - 1])
+                    self.hiddenLayer[L].nextLayer(self.outputLayer)
+
+            self.outputLayer.nextLayer(None)
+            self.outputLayer.previousLayer(self.hiddenLayer[self.numberOfHiddenLayers-1])
 
     def feed(self, someInputValues):
-        outputValues = self.hiddenLayer.feedForward(someInputValues)
+        outputValues = self.hiddenLayer[0].feedForward(someInputValues)
         return outputValues
 
     def train(self, someInputValues, expectedValues, learningRate, epochs):
+        self.createNetwork()
         for i in range(epochs):
             for j in range(np.shape(someInputValues)[0]):
                 self.feed(someInputValues[j])
                 self.outputLayer.backPropagationOutputLayer(expectedValues[j])
-                self.hiddenLayer.backPropagationHiddenLayer()
-                self.hiddenLayer.updateWeights(someInputValues[j], learningRate)
-                self.hiddenLayer.updateBias(learningRate)
+                self.hiddenLayer[self.numberOfHiddenLayers-1].backPropagationHiddenLayer()
+                self.hiddenLayer[0].updateWeights(someInputValues[j], learningRate)
+                self.hiddenLayer[0].updateBias(learningRate)
                 self.outputLayer.updateWeights(someInputValues[j], learningRate)
                 self.outputLayer.updateBias(learningRate)
-                self.hiddenLayer.resetOutputs()
-
+                self.hiddenLayer[0].resetOutputs()
 
 
 class NeuronLayer:
@@ -63,8 +94,13 @@ class NeuronLayer:
 
     def backPropagationHiddenLayer(self):
         theError = np.dot(self.__nextLayer.get_deltas(), self.__nextLayer.get_weights())
-        for i in range(self.numberOfNeuronsInLayer):
-            self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[0], theError[0])
+        if self.__previousLayer is None:
+            for i in range(self.numberOfNeuronsInLayer):
+                self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[0], theError[0])
+        else:
+            for i in range(self.numberOfNeuronsInLayer):
+                self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[0], theError[0])
+            self.__previousLayer.backPropagationHiddenLayer()
 
     def get_deltas(self):
         deltas = np.array([self.neuronsInLayer[i].get_delta_value() for i in range(self.numberOfNeuronsInLayer)])
@@ -97,7 +133,7 @@ class NeuronLayer:
 class Neuron:
     def __init__(self, numberOfInputs):
         self.weightValues = np.random.randn(numberOfInputs)
-        self.bias = np.random.rand(1)
+        self.bias = np.random.randn(1)
 
     def output(self, inputValues):
         print 'input Values : ' + str(inputValues)
@@ -142,19 +178,11 @@ class Neuron:
         # XOR
 
 
-Net = NeuralNetwork(2, 3, 1)
+Net = NeuralNetwork(2, [3, 2], 1)
 Input = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
 Expect = np.array([[1], [0], [0], [1]])
-learningRate = 0.005
-epochs = 50
+learningRate = 0.01
+epochs = 10
 
 Net.train(Input, Expect, learningRate, epochs)
-print Net.feed(np.array([1, 1]))
-
-
-
-#en vez de arreglos usar for  -> tarea 01 (ultima prioridad)
-#agregar flexibilidad con las capas -> tarea 01
-#agregar threshold  -> tarea 01
-#variables temporales
-#backprop
+A = Net.feed(np.array([1, 1]))
