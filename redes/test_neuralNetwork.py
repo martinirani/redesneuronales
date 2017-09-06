@@ -26,7 +26,7 @@ class TestNeuralNetwork(TestCase):
         self.assertEqual(Net.hiddenLayer[0].numberOfInputs, 2)
         self.assertEqual(len(Net.hiddenLayer[0].neuronsInLayer), 3)
         self.assertEqual(len(Net.outputLayer.neuronsInLayer[0].ouput), 1)
-
+        
     def testVerifyDeltas(self):
         pass
 

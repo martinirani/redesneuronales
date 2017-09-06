@@ -1,7 +1,9 @@
 from scipy.io import arff
 import numpy as np
-import NeuralNetwork_2 as NN
+import NeuralNetwork as NN
 from cStringIO import StringIO
+import time
+import matplotlib.pyplot as plt
 
 # 1. Importing data
 EEG_Eye_State = """
@@ -15038,32 +15040,38 @@ testDataLabel = dataLabel[1::2]
 
 # 5. Training the NN
 
+timeA = time.time()
 print "Training the Neural Network"
-Net = NN.NeuralNetwork(13, [5, 3, 3, 5], 1)
+Net = NN.NeuralNetwork(13, [5, 3], 1)
 Input = trainDataInput
 Expect = trainDataLabel
-learningRate = 0.001
-epochs = 20
+learningRate = 0.01
+epochs = 10
 
 Net.train(Input, Expect, learningRate, epochs)
+timeB = time.time()
 
+print 'the network takes ' + str(timeB - timeA) + ' seconds training the data'
 # 6. Classifying the data
 
 print "Classifying data"
 outputs = []
 threshold = 0.5
 
+timeA = time.time()
 for i in range(len(testDataInput)):
-    outputValue = Net.feed(testDataInput[i])[0]
-    print outputValue
+    outputValue = Net.feed(testDataInput[i])
     if outputValue > threshold:
         outputs.append(1)
     else:
         outputs.append(0)
     Net.hiddenLayer[0].resetOutputs()
+timeB = time.time()
 
 print outputs
 print testDataLabel
+print 'the network takes ' + str(timeB - timeA) + ' seconds classifying the data'
+
 
 # 7. Printing precision, true positive rate and false positive rate"""
 

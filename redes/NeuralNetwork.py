@@ -47,24 +47,17 @@ class NeuralNetwork:
         return outputValues
 
     def train(self, someInputValues, expectedValues, learningRate, epochs):
-        self.totalError = []
         self.createNetwork()
         for i in range(epochs):
             for j in range(np.shape(someInputValues)[0]):
                 self.feed(someInputValues[j])
                 self.outputLayer.backPropagationOutputLayer(expectedValues[j])
-                self.getError()
-                print self.getError()
                 self.hiddenLayer[self.numberOfHiddenLayers-1].backPropagationHiddenLayer()
                 self.hiddenLayer[0].updateWeights(someInputValues[j], learningRate)
                 self.hiddenLayer[0].updateBias(learningRate)
                 self.outputLayer.updateWeights(someInputValues[j], learningRate)
                 self.outputLayer.updateBias(learningRate)
                 self.hiddenLayer[0].resetOutputs()
-
-            self.totalError.append(np.sum([self.getError]))
-        print self.totalError
-        return self.totalError
 
     def performance(self, outputValues, expectedValues):
 
@@ -92,8 +85,6 @@ class NeuralNetwork:
 
         return TP, FP, TN, FN, TPRate, FPRate, Precision
 
-    def getError(self):
-        return self.outputLayer.theError
 
 class NeuronLayer:
     def __init__(self, numberOfInputs, numberOfNeuronsInLayer):
@@ -101,7 +92,6 @@ class NeuronLayer:
         self.numberOfNeuronsInLayer = numberOfNeuronsInLayer
         self.neuronsInLayer = [Neuron(self.numberOfInputs) for i in range(self.numberOfNeuronsInLayer)]
         self.someOutputs = []
-        self.theError = []
 
     def feedForward(self, someInputValues):  # Feed the neuron layer with some inputs
         for i in range(self.numberOfNeuronsInLayer):  # loop for feeding every neuron in the layer
@@ -119,7 +109,6 @@ class NeuronLayer:
 
     def backPropagationOutputLayer(self, expectedValue):
         theError = np.subtract(expectedValue, self.someOutputs)
-        self.theError = theError[0]
         for i in range(self.numberOfNeuronsInLayer):
             self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[i], theError[0])
 
