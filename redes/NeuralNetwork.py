@@ -5,9 +5,9 @@ class NeuralNetwork:
     def __init__(self, numberOfInputs, numberOfNeuronsInHiddenLayer, numberOfOutputs):
         self.numberOfInputs = numberOfInputs
         self.numberOfNeuronsInHiddenLayer = numberOfNeuronsInHiddenLayer
-        self.numberOfHiddenLayers = len(self.numberOfNeuronsInHiddenLayer)
+        self.numberOfHiddenLayers = len(numberOfNeuronsInHiddenLayer)
         self.numberOfOutputs = numberOfOutputs
-        self.hiddenLayer = [None] * len(self.numberOfNeuronsInHiddenLayer)
+        self.hiddenLayer = [None] * len(numberOfNeuronsInHiddenLayer)
 
     def createNetwork(self):
 
@@ -47,17 +47,24 @@ class NeuralNetwork:
         return outputValues
 
     def train(self, someInputValues, expectedValues, learningRate, epochs):
+        self.totalError = []
         self.createNetwork()
         for i in range(epochs):
             for j in range(np.shape(someInputValues)[0]):
                 self.feed(someInputValues[j])
                 self.outputLayer.backPropagationOutputLayer(expectedValues[j])
+                self.getError()
+                print self.getError()
                 self.hiddenLayer[self.numberOfHiddenLayers-1].backPropagationHiddenLayer()
                 self.hiddenLayer[0].updateWeights(someInputValues[j], learningRate)
                 self.hiddenLayer[0].updateBias(learningRate)
                 self.outputLayer.updateWeights(someInputValues[j], learningRate)
                 self.outputLayer.updateBias(learningRate)
                 self.hiddenLayer[0].resetOutputs()
+
+            self.totalError.append(np.sum([self.getError]))
+        print self.totalError
+        return self.totalError
 
     def performance(self, outputValues, expectedValues):
 
@@ -85,18 +92,22 @@ class NeuralNetwork:
 
         return TP, FP, TN, FN, TPRate, FPRate, Precision
 
+    def getError(self):
+        return self.outputLayer.theError
+
 class NeuronLayer:
     def __init__(self, numberOfInputs, numberOfNeuronsInLayer):
         self.numberOfInputs = numberOfInputs
         self.numberOfNeuronsInLayer = numberOfNeuronsInLayer
         self.neuronsInLayer = [Neuron(self.numberOfInputs) for i in range(self.numberOfNeuronsInLayer)]
         self.someOutputs = []
+        self.theError = []
 
     def feedForward(self, someInputValues):  # Feed the neuron layer with some inputs
         for i in range(self.numberOfNeuronsInLayer):  # loop for feeding every neuron in the layer
             self.someOutputs.append(self.neuronsInLayer[i].output(someInputValues))
         if self.__nextLayer is None:  # if there is not next layer
-            return self.someOutputs
+            return np.amax(self.someOutputs)
         else:  # if there is a layer, pass it to the next layer
             return self.__nextLayer.feedForward(self.someOutputs)
 
@@ -108,6 +119,7 @@ class NeuronLayer:
 
     def backPropagationOutputLayer(self, expectedValue):
         theError = np.subtract(expectedValue, self.someOutputs)
+        self.theError = theError[0]
         for i in range(self.numberOfNeuronsInLayer):
             self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[i], theError[0])
 
@@ -186,14 +198,4 @@ class Neuron:
 
 
 
-
-# XOR
-"""Net = NeuralNetwork(2, [3], 1)
-Input = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
-Expect = np.array([[1], [0], [0], [1]])
-learningRate = 0.01
-epochs = 100
-
-Net.train(Input, Expect, learningRate, epochs)
-A = Net.feed(np.array([1, 1]))"""
 
