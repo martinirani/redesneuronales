@@ -8,7 +8,6 @@ class NeuralNetwork:
         self.numberOfHiddenLayers = len(self.numberOfNeuronsInHiddenLayer)
         self.numberOfOutputs = numberOfOutputs
         self.hiddenLayer = [None] * len(self.numberOfNeuronsInHiddenLayer)
-        print self.hiddenLayer
 
     def createNetwork(self):
 
@@ -27,7 +26,6 @@ class NeuralNetwork:
                     self.hiddenLayer[L] = NeuronLayer(self.numberOfInputs, self.numberOfNeuronsInHiddenLayer[L])
                 elif 0 < L <= self.numberOfHiddenLayers-1:
                     self.hiddenLayer[L] = NeuronLayer(self.numberOfNeuronsInHiddenLayer[L-1], self.numberOfNeuronsInHiddenLayer[L])
-            print self.hiddenLayer
             self.outputLayer = NeuronLayer(self.numberOfNeuronsInHiddenLayer[self.numberOfHiddenLayers-1], self.numberOfOutputs)
 
             for L in range(self.numberOfHiddenLayers):
@@ -61,6 +59,31 @@ class NeuralNetwork:
                 self.outputLayer.updateBias(learningRate)
                 self.hiddenLayer[0].resetOutputs()
 
+    def performance(self, outputValues, expectedValues):
+
+        TP = 0
+        FP = 0
+        TN = 0
+        FN = 0
+
+        for i in range(len(expectedValues)):
+            if outputValues[i] == expectedValues[i] == 1:
+                TP += 1
+        for i in range(len(expectedValues)):
+            if expectedValues[i] == 1 and outputValues[i] != expectedValues[i]:
+                FP += 1
+        for i in range(len(expectedValues)):
+            if outputValues[i] == expectedValues[i] == 0:
+                TN += 1
+        for i in range(len(expectedValues)):
+            if expectedValues[i] == 0 and outputValues != expectedValues[i]:
+                FN += 1
+
+        TPRate = TP/(TP+FN)
+        FPRate = FP/(FP+TN)
+        Precision = (FP+TN)/(len(expectedValues))
+
+        return TP, FP, TN, FN, TPRate, FPRate, Precision
 
 class NeuronLayer:
     def __init__(self, numberOfInputs, numberOfNeuronsInLayer):
@@ -71,10 +94,8 @@ class NeuronLayer:
 
     def feedForward(self, someInputValues):  # Feed the neuron layer with some inputs
         for i in range(self.numberOfNeuronsInLayer):  # loop for feeding every neuron in the layer
-            print 'we are in neuron ' + str(i + 1)
             self.someOutputs.append(self.neuronsInLayer[i].output(someInputValues))
         if self.__nextLayer is None:  # if there is not next layer
-            print self.someOutputs
             return self.someOutputs
         else:  # if there is a layer, pass it to the next layer
             return self.__nextLayer.feedForward(self.someOutputs)
@@ -86,10 +107,8 @@ class NeuronLayer:
         self.__previousLayer = aLayer
 
     def backPropagationOutputLayer(self, expectedValue):
-        theError = expectedValue - self.someOutputs
+        theError = np.subtract(expectedValue, self.someOutputs)
         for i in range(self.numberOfNeuronsInLayer):
-            print 'the Error at the output layer is ' + str(theError[0])
-            print self.someOutputs[0]
             self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[i], theError[0])
 
     def backPropagationHiddenLayer(self):
@@ -123,9 +142,9 @@ class NeuronLayer:
             self.neuronsInLayer[i].adjustBiasUsingLearningRate(learningRate)
 
     def resetOutputs(self):
-        if self.__nextLayer is None:  # if there is not next layer
+        if self.__nextLayer is None:
             self.someOutputs = []
-        else:  # if there is a layer, clean next layer
+        else:
             self.someOutputs = []
             self.__nextLayer.resetOutputs()
 
@@ -136,11 +155,8 @@ class Neuron:
         self.bias = np.random.randn(1)
 
     def output(self, inputValues):
-        print 'input Values : ' + str(inputValues)
-        print 'weight Values :' + str(self.weightValues)
         Z = np.dot(inputValues, self.weightValues) + self.bias
         self.outputValue = 1 / (1 + np.exp(-Z))
-        print 'output Values' + str(self.outputValue)
         return self.outputValue[0]
 
     def get_output_value(self):
@@ -153,18 +169,11 @@ class Neuron:
 
     def adjustDeltaWith(self, output, anError):
         self.delta = anError * self.transferDerivative(output)
-        print 'At this layer, delta is ' + str(self.delta)
         return self.delta
 
     def adjustWeightWithInput(self, inputs, learningRate):
-        print 'we are now adjusting the weights'
-        print 'learning rate: ' + str(learningRate)
-        print 'delta :' + str(self.delta)
-        print 'inputs :' + str(inputs)
-        print 'weightValues before :' + str(self.weightValues)
         for i in range(len(inputs)):
             self.weightValues[i] = self.weightValues[i] + (learningRate * self.delta * inputs[i])
-        print ' weightValues after :' + str(self.weightValues)
 
     def get_delta_value(self):
         return self.delta
@@ -175,14 +184,16 @@ class Neuron:
     def transferDerivative(self, output):
         return output * (1 - output)
 
-        # XOR
 
 
-Net = NeuralNetwork(2, [3, 2], 1)
+
+# XOR
+"""Net = NeuralNetwork(2, [3], 1)
 Input = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
 Expect = np.array([[1], [0], [0], [1]])
 learningRate = 0.01
-epochs = 10
+epochs = 100
 
 Net.train(Input, Expect, learningRate, epochs)
-A = Net.feed(np.array([1, 1]))
+A = Net.feed(np.array([1, 1]))"""
+
