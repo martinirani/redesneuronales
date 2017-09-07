@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
 
 
 class NeuralNetwork:
@@ -45,8 +44,7 @@ class NeuralNetwork:
         return outputValues
 
     def train(self, someInputValues, expectedValues, learningRate, epochs):
-        Error = []
-        averageError = []
+
         for i in range(epochs):
             for j in range(np.shape(someInputValues)[0]):
                 self.feed(someInputValues[j])
@@ -57,12 +55,6 @@ class NeuralNetwork:
                 self.outputLayer.updateWeights(someInputValues[j], learningRate)
                 self.outputLayer.updateBias(learningRate)
                 self.hiddenLayer[0].resetOutputs()
-            for j in range(np.shape(someInputValues)[0]):  # compute the error after the epoch
-                Error.append(expectedValues[j] - self.feed(someInputValues[j]))
-                self.hiddenLayer[0].resetOutputs()
-            averageError.append(sum(np.square(Error[i])) / len(Error[i]))
-        plt.plot(range(epochs), averageError)
-        plt.show()  # plots learning curve
 
     def performance(self, outputValues, expectedValues):
 
