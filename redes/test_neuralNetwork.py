@@ -26,9 +26,10 @@ class TestNeuralNetwork(TestCase):
         self.assertEqual(Net.hiddenLayer[0].numberOfInputs, 2)
         self.assertEqual(len(Net.hiddenLayer[0].neuronsInLayer), 3)
         self.assertEqual(len(Net.outputLayer.neuronsInLayer[0].ouput), 1)
-        
+        self.assertEqual()
+
     def testVerifyDeltas(self):
-        pass
+        self.assertEqual()
 
     def testBiasUpdate(self):
         pass
