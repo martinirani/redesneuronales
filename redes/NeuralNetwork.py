@@ -46,18 +46,23 @@ class NeuralNetwork:
 
     def train(self, someInputValues, expectedValues, learningRate, epochs):
         Error = []
-        errorAbs = []
+        averageError = []
         for i in range(epochs):
             for j in range(np.shape(someInputValues)[0]):
                 self.feed(someInputValues[j])
                 self.outputLayer.backPropagationOutputLayer(expectedValues[j])
-                self.hiddenLayer[self.numberOfHiddenLayers-1].backPropagationHiddenLayer()
+                self.hiddenLayer[self.numberOfHiddenLayers - 1].backPropagationHiddenLayer()
                 self.hiddenLayer[0].updateWeights(someInputValues[j], learningRate)
                 self.hiddenLayer[0].updateBias(learningRate)
+                self.outputLayer.updateWeights(someInputValues[j], learningRate)
+                self.outputLayer.updateBias(learningRate)
                 self.hiddenLayer[0].resetOutputs()
             for j in range(np.shape(someInputValues)[0]):  # compute the error after the epoch
-                Error.append(self.feed(someInputValues[j]) - expectedValues[j])
+                Error.append(expectedValues[j] - self.feed(someInputValues[j]))
                 self.hiddenLayer[0].resetOutputs()
+            averageError.append(sum(np.square(Error[i])) / len(Error[i]))
+        plt.plot(range(epochs), averageError)
+        plt.show()  # plots learning curve
 
     def performance(self, outputValues, expectedValues):
 
@@ -93,7 +98,6 @@ class NeuronLayer:
         self.numberOfNeuronsInLayer = numberOfNeuronsInLayer
         self.neuronsInLayer = [Neuron(self.numberOfInputs) for i in range(self.numberOfNeuronsInLayer)]
         self.someOutputs = []
-        self.theError = []
 
     def feedForward(self, someInputValues):  # Feed the neuron layer with some inputs
         for i in range(self.numberOfNeuronsInLayer):  # loop for feeding every neuron in the layer
@@ -125,34 +129,24 @@ class NeuronLayer:
             self.__previousLayer.backPropagationHiddenLayer()
 
     def get_deltas(self):
-        deltas = [self.neuronsInLayer[i].get_delta_value() for i in range(self.numberOfNeuronsInLayer)]
+        deltas = np.array([self.neuronsInLayer[i].get_delta_value() for i in range(self.numberOfNeuronsInLayer)])
         return deltas
 
     def get_weights(self):
-        weights = [self.neuronsInLayer[i].get_weight_value() for i in range(self.numberOfNeuronsInLayer)]
+        weights = np.array([self.neuronsInLayer[i].get_weight_value() for i in range(self.numberOfNeuronsInLayer)])
         return weights
 
     def updateWeights(self, inputs, learningRate):
         if self.__previousLayer is None:
             for i in range(self.numberOfNeuronsInLayer):
                 self.neuronsInLayer[i].adjustWeightWithInput(inputs, learningRate)
-        elif self.__nextLayer is None:
-            for i in range(self.numberOfNeuronsInLayer):
-                self.neuronsInLayer[i].adjustWeightWithInput(self.__previousLayer.someOutputs, learningRate)
         else:
             for i in range(self.numberOfNeuronsInLayer):
                 self.neuronsInLayer[i].adjustWeightWithInput(self.__previousLayer.someOutputs, learningRate)
-            self.__nextLayer.updateWeights(self.someOutputs, learningRate)
 
     def updateBias(self, learningRate):
-        if self.__nextLayer is None:
-            for i in range(self.numberOfNeuronsInLayer):
-                self.neuronsInLayer[i].adjustBiasUsingLearningRate(learningRate)
-        else:
-            for i in range(self.numberOfNeuronsInLayer):
-                self.neuronsInLayer[i].adjustBiasUsingLearningRate(learningRate)
-            self.__nextLayer.updateBias(learningRate)
-
+        for i in range(self.numberOfNeuronsInLayer):
+            self.neuronsInLayer[i].adjustBiasUsingLearningRate(learningRate)
 
     def resetOutputs(self):
         if self.__nextLayer is None:
@@ -160,7 +154,6 @@ class NeuronLayer:
         else:
             self.someOutputs = []
             self.__nextLayer.resetOutputs()
-
 
 class Neuron:
     def __init__(self, numberOfInputs):
@@ -197,17 +190,6 @@ class Neuron:
     def transferDerivative(self, output):
         return output * (1 - output)
 
-
-Net = NeuralNetwork(2, [3], 1)
-Input = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
-Expect = np.array([[1], [0], [0], [1]])
-learningRate = 0.01
-epochs = 1
-
-test = np.array([0, 0])
-Net.train(Input, Expect, learningRate, epochs)
-outputValue = Net.feed(test)
-print outputValue
 
 
 
