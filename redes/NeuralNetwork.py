@@ -206,4 +206,4 @@ epochs = 300
 test = [1, 0]
 Net.train(Input, Expect, learningRate, epochs)
 outputValue = Net.feed(test)
-print outputValue""""""
+print outputValue""""
