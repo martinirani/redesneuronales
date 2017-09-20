@@ -10,14 +10,12 @@ class NeuralNetwork:
         self.numberOfOutputs = numberOfOutputs
         self.hiddenLayer = [None] * len(numberOfNeuronsInHiddenLayer)
         if self.numberOfHiddenLayers is 1:
-
             self.hiddenLayer[0] = NeuronLayer(self.numberOfInputs, self.numberOfNeuronsInHiddenLayer[0])
             self.outputLayer = NeuronLayer(self.numberOfNeuronsInHiddenLayer[0], self.numberOfOutputs)
             self.hiddenLayer[0].nextLayer(self.outputLayer)
             self.outputLayer.nextLayer(None)
             self.outputLayer.previousLayer(self.hiddenLayer[0])
             self.hiddenLayer[0].previousLayer(None)
-
         else:
             for L in range(self.numberOfHiddenLayers):
                 if L is 0:
@@ -25,7 +23,6 @@ class NeuralNetwork:
                 elif 0 < L <= self.numberOfHiddenLayers-1:
                     self.hiddenLayer[L] = NeuronLayer(self.numberOfNeuronsInHiddenLayer[L-1], self.numberOfNeuronsInHiddenLayer[L])
             self.outputLayer = NeuronLayer(self.numberOfNeuronsInHiddenLayer[self.numberOfHiddenLayers-1], self.numberOfOutputs)
-
             for L in range(self.numberOfHiddenLayers):
                 if L is 0:
                     self.hiddenLayer[L].nextLayer(self.hiddenLayer[L + 1])
@@ -36,7 +33,6 @@ class NeuralNetwork:
                 elif L is self.numberOfHiddenLayers - 1:
                     self.hiddenLayer[L].previousLayer(self.hiddenLayer[L - 1])
                     self.hiddenLayer[L].nextLayer(self.outputLayer)
-
             self.outputLayer.nextLayer(None)
             self.outputLayer.previousLayer(self.hiddenLayer[self.numberOfHiddenLayers-1])
 
@@ -61,6 +57,8 @@ class NeuralNetwork:
                 Error.append(expectedValues[j] - self.feed(someInputValues[j]))
                 self.hiddenLayer[0].resetOutputs()
             averageError.append(sum(np.square(Error[i])) / len(Error[i]))
+
+        print averageError
         plt.plot(range(epochs), averageError)
         plt.show()  # plots learning curve
 
@@ -98,6 +96,8 @@ class NeuronLayer:
         self.numberOfNeuronsInLayer = numberOfNeuronsInLayer
         self.neuronsInLayer = [Neuron(self.numberOfInputs) for i in range(self.numberOfNeuronsInLayer)]
         self.someOutputs = []
+        self.__nextLayer = None
+        self.__previousLayer = None
 
     def feedForward(self, someInputValues):  # Feed the neuron layer with some inputs
         for i in range(self.numberOfNeuronsInLayer):  # loop for feeding every neuron in the layer
@@ -122,10 +122,10 @@ class NeuronLayer:
         theError = np.dot(self.__nextLayer.get_deltas(), self.__nextLayer.get_weights())
         if self.__previousLayer is None:
             for i in range(self.numberOfNeuronsInLayer):
-                self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[0], theError[0])
+                self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[i], theError[i])
         else:
             for i in range(self.numberOfNeuronsInLayer):
-                self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[0], theError[0])
+                self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[i], theError[i])
             self.__previousLayer.backPropagationHiddenLayer()
 
     def get_deltas(self):
@@ -155,7 +155,9 @@ class NeuronLayer:
             self.someOutputs = []
             self.__nextLayer.resetOutputs()
 
+
 class Neuron:
+
     def __init__(self, numberOfInputs):
         self.weightValues = np.random.randn(numberOfInputs)
         self.bias = np.random.randn(1)
@@ -180,24 +182,28 @@ class Neuron:
     def adjustWeightWithInput(self, inputs, learningRate):
         for i in range(len(inputs)):
             self.weightValues[i] = self.weightValues[i] + (learningRate * self.delta * inputs[i])
+        return self.weightValues
 
     def get_delta_value(self):
-        return self.delta
+        delta = self.delta
+        return delta
 
     def get_weight_value(self):
         return self.weightValues
 
     def transferDerivative(self, output):
-        return output * (1 - output)
+        transferDerivative = output * (1 - output)
+        return transferDerivative
 
 
-Net = NeuralNetwork(2, [3], 1)
-Input = np.array([[0, 0], [1, 0], [0, 1], [1, 1]])
-Expect = np.array([[1], [0], [0], [1]])
-learningRate = 0.01
-epochs = 100
+# XOR
+"""Net = NeuralNetwork(2, [3, 3], 1)
+Input = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
+Expect = np.array([[0], [1], [1], [0]])
+learningRate = 0.1
+epochs = 300
 
-test = np.array([0, 0])
+test = [1, 0]
 Net.train(Input, Expect, learningRate, epochs)
 outputValue = Net.feed(test)
-print outputValue
+print outputValue""""""
