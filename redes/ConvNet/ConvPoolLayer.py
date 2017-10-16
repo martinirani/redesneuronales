@@ -1,5 +1,5 @@
 import numpy as np
-
+import time
 
 class ConvNet:
     def __init__(self,
@@ -110,6 +110,7 @@ class ConvNet:
         self.aFCLayer = np.zeros(numberOfFCLayers)
 
         for layerIndex in range(numberOfFCLayers):
+            inputShape = self.aFCLayer[layerIndex].__previousLayer.outputValues.shape
             while layerIndex is 0:
                 self.aFCLayer[layerIndex] = FCLayer(inputShape,
                                                     numberOfNeuronsInLayer,
@@ -141,17 +142,17 @@ class ConvNet:
     def backward(self, expectedValues):
         return self.aFCLayer[self.numberOfFCLayers].backpropagation(expectedValues)
 
-    def updateParameters(self, learningRate, BatchSize):
-        return self.timeConvLayer.updateParams(learningRate, BatchSize)
+    def updateParameters(self, learningRate):
+        return self.timeConvLayer.updateParams(learningRate)
 
     def performance(self):
         pass
 
-    def training(self, someInputValues, expectedValues, learningRate, BatchSize):
+    def training(self, someInputValues, expectedValues, learningRate):
         timeA = time.time()
         self.forward(someInputValues)
         self.backward(expectedValues)
-        self.updateParameters(learningRate, BatchSize)
+        self.updateParameters(learningRate)
         timeB = time.time()
         Error = np.subtract(expectedValues, self.forward(someInputValues))
         print 'the training took ' + str(timeB - timeA) + ' seconds'
@@ -261,7 +262,7 @@ class Conv2DLayer:
         elif self.activationFunction is 'sigmoid':  # Applies sigmoid function
             return self.sigmoid(self.outputValues)
 
-    def backPropagationConvLayer(self, deltasNext):
+    def backPropagationConvLayer(self):
 
         """
         backward pass of Conv layer.
@@ -274,23 +275,23 @@ class Conv2DLayer:
          """
 
         # Compute Deltas
-        deltas = []
+        self.deltas = []
         for n in range(self.inputShape[0]):
             for nf in range(self.numberOfFilters):
                 deltas_i = self.activationFunctionDerivative(self.inputs[n, nf], self.activationFunction) * \
-                           deltasNext[n][nf]
-                deltas.append(deltas_i)
+                           self.__nextLayer.getDeltas()[n][nf]
+                self.deltas.append(deltas_i)
 
         # Compute delta Biases
         deltaBiases = []
-        for delta in deltas:
+        for delta in self.deltas:
             deltaBiases.append(np.sum(delta))
 
             # Compute delta Kernels
         deltaKernel = np.zeros(self.weights)
         for n in range(self.inputShape[0]):
             for nf in range(self.numberOfFilters):
-                flippedDelta = self.flipArray(deltas[n, nf, :, :])  # Flips Kernel for the convolution
+                flippedDelta = self.flipArray(self.deltas[n, nf, :, :])  # Flips Kernel for the convolution
                 for cin in range(self.inputShape[1]):
                     for w in np.arange(0, self.inputs.shape[3] - self.kernelSize[1] + 1, self.stride[1]):
                         for h in np.arange(0, self.inputs.shape[2] - self.kernelSize[0] + 1, self.stride[0]):
@@ -300,16 +301,16 @@ class Conv2DLayer:
         self.deltaWeights = deltaKernel
         self.deltaBiases = deltaBiases
 
-        return deltas, self.deltaWeights, self.deltaBiases
+        return self.deltas, self.deltaWeights, self.deltaBiases
 
-    def updateParams(self, learningRate, batchSize):
+    def updateParams(self, learningRate):
         """
         :param learningRate: value of learning Rate
 
         :return self.weights: updated weights
         :return self.bias: updated biases
         """
-        self.weights -= learningRate * (self.deltaWeights * self.weights / batchSize)
+        self.weights -= learningRate * (self.deltaWeights * self.weights)
         self.bias -= learningRate * self.deltaBiases
 
     def elu(self, outputValues, alpha):
@@ -342,6 +343,8 @@ class Conv2DLayer:
     def flipArray(self, anArray):
         return np.fliplr(np.flipud(anArray))
 
+    def getDeltas(self):
+        return self.deltas
 
 class PoolLayer:
     def __init__(self, inputShape, kernelSize, stride):
@@ -395,18 +398,19 @@ class PoolLayer:
         delta: delta values of shape (N, D, H/factor, W/factor)
         """
 
-        deltas = np.zeros_like(self.someInputs)
-        print deltas.shape
+        self.deltas = np.zeros_like(self.someInputs)
+        print self.deltas.shape
         # for para dar los valores del delta siguiente a los maximos
         idx = 0
         for n in range(self.inputShape[0]):
             for c in range(self.inputShape[1]):
                 for w in range(deltasNext.shape[3]):
                     for h in range(deltasNext.shape[2]):
-                        deltas[n, c, self.maxIdx[idx][0], self.maxIdx[idx][1]] = deltasNext[n, c, h, w]
+                        self.deltas[n, c, self.maxIdx[idx][0], self.maxIdx[idx][1]] = self.__nextLayer.getDeltas()[
+                            n, c, h, w]
                         idx += 1
 
-        self.deltas = deltas
+        self.deltas = self.deltas
         return self.deltas
 
     def nextLayer(self, aLayer):
@@ -415,6 +419,8 @@ class PoolLayer:
     def previousLayer(self, aLayer):
         self.__previousLayer = aLayer
 
+    def getDeltas(self):
+        return self.deltas
 
 class BatchNormalizationLayer:
     def __init__(self, inputShape, gamma, beta, eps):
@@ -650,8 +656,6 @@ class FCLayer:
         if activationFunction is 'elu':
             self.transferDerivative = (outputValues < 0) * self.elu(outputValues, self.alpha) + self.alpha
 
-    def dropOut(self):
-        pass
 
     def nextLayer(self, aLayer):
         self.__nextLayer = aLayer
@@ -678,7 +682,7 @@ class FCLayer:
         return self.deltas
 
 
-inputShape = [1, 2, 3, 3]
+"""inputShape = [1, 2, 3, 3]
 kernelSize = [2, 2]
 numberOfFilters = 5
 pading = 1
@@ -689,4 +693,4 @@ ConvL = Conv2DLayer(inputShape, kernelSize, numberOfFilters, stride, pading, act
 input = np.random.rand(1, 2, 3, 3)
 X = ConvL.conv2D(input)
 PoolL = PoolLayer(X.shape, [2, 2], stride)
-print PoolL.maxPool2d(X)
+print PoolL.maxPool2d(X)"""

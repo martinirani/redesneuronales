@@ -39,7 +39,7 @@ class PerceptronAnd(object, Perceptron):
         self.weight = len(x) * [1]
 
 
-n_points = 50
+n_points = 100
 
 class PerceptronOr(object, Perceptron):
     """only admits inputs values 0 and 1"""
@@ -98,7 +98,7 @@ x_pop2_label = np.zeros((n_points, 1))
 x = np.concatenate((x_population1, x_population2), axis=0)
 y = np.concatenate((x_pop1_label, x_pop2_label), axis=0)
 
-train_num = 200
+train_num = 1
 b = 1
 learningrate = 0.01
 

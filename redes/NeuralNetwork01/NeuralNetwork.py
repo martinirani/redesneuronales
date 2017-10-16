@@ -1,9 +1,17 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 
 class NeuralNetwork:
+
     def __init__(self, numberOfInputs, numberOfNeuronsInHiddenLayer, numberOfOutputs):
+        """
+
+        :param numberOfInputs:
+        :param numberOfNeuronsInHiddenLayer:
+        :param numberOfOutputs:
+        """
         self.numberOfInputs = numberOfInputs
         self.numberOfNeuronsInHiddenLayer = numberOfNeuronsInHiddenLayer
         self.numberOfHiddenLayers = len(numberOfNeuronsInHiddenLayer)
@@ -37,12 +45,26 @@ class NeuralNetwork:
             self.outputLayer.previousLayer(self.hiddenLayer[self.numberOfHiddenLayers-1])
 
     def feed(self, someInputValues):
+        """
+
+        :param someInputValues:
+        :return:
+        """
         outputValues = self.hiddenLayer[0].feedForward(someInputValues)
         return outputValues
 
     def train(self, someInputValues, expectedValues, learningRate, epochs):
+        """
+
+        :param someInputValues:
+        :param expectedValues:
+        :param learningRate:
+        :param epochs:
+        :return:
+        """
         Error = []
         averageError = []
+        timeA = time.time()
         for i in range(epochs):
             for j in range(np.shape(someInputValues)[0]):
                 self.feed(someInputValues[j])
@@ -54,15 +76,23 @@ class NeuralNetwork:
                 self.outputLayer.updateBias(learningRate)
                 self.hiddenLayer[0].resetOutputs()
             for j in range(np.shape(someInputValues)[0]):  # compute the error after the epoch
-                Error.append(expectedValues[j] - self.feed(someInputValues[j]))
+                Error.append(np.subtract(expectedValues[j], self.feed(someInputValues[j])))
+                self.hiddenLayer[0].resetOutputs()
                 self.hiddenLayer[0].resetOutputs()
             averageError.append(sum(np.square(Error[i])) / len(Error[i]))
+        timeB = time.time()
+        print 'the training took ' + str(timeB - timeA) + ' seconds'
 
-        print averageError
         plt.plot(range(epochs), averageError)
         plt.show()  # plots learning curve
 
     def performance(self, outputValues, expectedValues):
+        """
+
+        :param outputValues:
+        :param expectedValues:
+        :return:
+        """
 
         TP = 0
         FP = 0
@@ -92,6 +122,11 @@ class NeuralNetwork:
 class NeuronLayer:
 
     def __init__(self, numberOfInputs, numberOfNeuronsInLayer):
+        """
+
+        :param numberOfInputs:
+        :param numberOfNeuronsInLayer:
+        """
         self.numberOfInputs = numberOfInputs
         self.numberOfNeuronsInLayer = numberOfNeuronsInLayer
         self.neuronsInLayer = [Neuron(self.numberOfInputs) for i in range(self.numberOfNeuronsInLayer)]
@@ -100,6 +135,11 @@ class NeuronLayer:
         self.__previousLayer = None
 
     def feedForward(self, someInputValues):  # Feed the neuron layer with some inputs
+        """
+
+        :param someInputValues:
+        :return:
+        """
         for i in range(self.numberOfNeuronsInLayer):  # loop for feeding every neuron in the layer
             self.someOutputs.append(self.neuronsInLayer[i].output(someInputValues))
         if self.__nextLayer is None:  # if there is not next layer
@@ -108,17 +148,36 @@ class NeuronLayer:
             return self.__nextLayer.feedForward(self.someOutputs)
 
     def nextLayer(self, aLayer):
+        """
+
+        :param aLayer:
+        :return:
+        """
         self.__nextLayer = aLayer
 
     def previousLayer(self, aLayer):
+        """
+
+        :param aLayer:
+        :return:
+        """
         self.__previousLayer = aLayer
 
     def backPropagationOutputLayer(self, expectedValue):
+        """
+
+        :param expectedValue:
+        :return:
+        """
         theError = np.subtract(expectedValue, self.someOutputs)
         for i in range(self.numberOfNeuronsInLayer):
             self.neuronsInLayer[i].adjustDeltaWith(self.someOutputs[i], theError[i])
 
     def backPropagationHiddenLayer(self):
+        """
+
+        :return:
+        """
         theError = np.dot(self.__nextLayer.get_deltas(), self.__nextLayer.get_weights())
         if self.__previousLayer is None:
             for i in range(self.numberOfNeuronsInLayer):
@@ -129,10 +188,18 @@ class NeuronLayer:
             self.__previousLayer.backPropagationHiddenLayer()
 
     def get_deltas(self):
+        """
+
+        :return:
+        """
         deltas = np.array([self.neuronsInLayer[i].get_delta_value() for i in range(self.numberOfNeuronsInLayer)])
         return deltas
 
     def get_weights(self):
+        """
+
+        :return:
+        """
         weights = np.array([self.neuronsInLayer[i].get_weight_value() for i in range(self.numberOfNeuronsInLayer)])
         return weights
 
@@ -197,13 +264,16 @@ class Neuron:
 
 
 # XOR
-"""Net = NeuralNetwork(2, [3, 3], 1)
+Net = NeuralNetwork(2, [2], 1)
 Input = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
 Expect = np.array([[0], [1], [1], [0]])
-learningRate = 0.1
-epochs = 300
+learningRate = 1
+epochs = 3000
 
-test = [1, 0]
+test = np.array([[1, 1], [1, 0], [0, 1], [0, 0]])
 Net.train(Input, Expect, learningRate, epochs)
 outputValue = Net.feed(test)
-print outputValue""""
+if outputValue > 0.5:
+    print ">>>>>> The output is " + str(1)
+if outputValue <= 0.5:
+    print ">>>>>> The output is " + str(0)

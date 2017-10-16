@@ -15045,8 +15045,8 @@ print "Training the Neural Network"
 Net = NN.NeuralNetwork(13, [5, 3], 1)
 Input = trainDataInput
 Expect = trainDataLabel
-learningRate = 0.01
-epochs = 10
+learningRate = 5
+epochs = 10000
 
 Net.train(Input, Expect, learningRate, epochs)
 timeB = time.time()
