@@ -25,22 +25,19 @@ class ConvNet:
         # 1. First Conv-Pool Block
 
         # Time Convolution
+        print "initializing time conv layer"
         timeInputShape = (inputChannels, 1, 1, inputTimeLength)
         timeKernelSize = (1, filterTimeLength)
-        self.timeConvLayer = Conv2DLayer(timeInputShape, timeKernelSize, numberOfTimeFilters, stride=(1, 0),
+        self.timeConvLayer = Conv2DLayer(timeInputShape, timeKernelSize, numberOfTimeFilters, stride=(1, 1),
                                          zeroPadding=0, activationFunction='elu', alpha=1)
-        self.timeConvLayer.nextLayer(self.spaceConvLayer)
-        self.timeConvLayer.previousLayer(None)
 
         # Spatial Convolution
+        print "initializing space conv layer"
         spaceInputShape = (1, numberOfTimeFilters, inputChannels, self.timeConvLayer.outputValues.shape[3])
         spaceKernelSize = (1, inputChannels)
         self.spaceConvLayer = Conv2DLayer(spaceInputShape, spaceKernelSize, numberOfSpaceFilters,
                                           stride=(convStride, 1),
                                           zeroPadding=0, activationFunction='elu', alpha=1)
-
-        self.spaceConvLayer.previousLayer(self.timeConvLayer)
-        self.spaceConvLayer.nextLayer(self.poolLayer_1)
 
         # First pool Layer
 
@@ -48,57 +45,41 @@ class ConvNet:
         poolKernelSize_1 = (1, poolTimeLength)
         self.poolLayer_1 = PoolLayer(poolInputShape_1, poolKernelSize_1, stride=(1, poolTimeLengthStride))
 
-        self.poolLayer_1.previousLayer(self.spaceConvLayer)
-        self.poolLayer_1.nextLayer(self.convLayer_2)
-
         # 2. Second Conv-Pool Block
+        print "initializing third conv layer"
 
         convInputShape_2 = (
         1, numberOfSpaceFilters, self.poolLayer_1.outputValues.shape[2], self.poolLayer_1.outputValues.shape[3])
-        kernelSizeConv_2 = (filterTimeLength, 1)
+        kernelSizeConv_2 = (1, filterTimeLength)
         self.convLayer_2 = Conv2DLayer(convInputShape_2, kernelSizeConv_2, numberOfFilters2, stride=(convStride, 1),
                                        zeroPadding=0, activationFunction='elu', alpha=1)
-
-        self.convLayer_2.previousLayer(self.poolLayer_1)
-        self.convLayer_2.nextLayer(self.poolLayer_2)
 
         poolInputShape_2 = (
         1, numberOfFilters2, self.convLayer_2.outputValues.shape[2], self.convLayer_2.outputValues.shape[3])
         poolKernelSize_2 = (1, poolTimeLength)
         self.poolLayer_2 = PoolLayer(poolInputShape_2, poolKernelSize_2, stride=(1, poolTimeLengthStride))
 
-        self.poolLayer_2.previousLayer(self.convLayer_2)
-        self.poolLayer_2.nextLayer(self.convLayer_3)
-
         # 3. Third Conv-Pool Block
-
+        print "initializing fourth conv layer"
         convInputShape_3 = (
         1, numberOfFilters2, self.poolLayer_2.outputValues.shape[2], self.poolLayer_2.outputValues.shape[3])
-        kernelSizeConv_3 = (filterLength2, 1)
+        kernelSizeConv_3 = (1, filterLength2)
         self.convLayer_3 = Conv2DLayer(convInputShape_3, kernelSizeConv_3, numberOfFilters3, stride=(convStride, 1),
                                        zeroPadding=0, activationFunction='elu', alpha=1)
-
-        self.convLayer_3.previousLayer(self.poolLayer_2)
-        self.convLayer_3.nextLayer(self.poolLayer_3)
 
         poolInputShape_3 = (
         1, numberOfFilters3, self.convLayer_3.outputValues.shape[2], self.convLayer_3.outputValues.shape[3])
         poolKernelSize_3 = (1, poolTimeLength)
         self.poolLayer_3 = PoolLayer(poolInputShape_3, poolKernelSize_3, stride=(1, poolTimeLengthStride))
 
-        self.poolLayer_3.previousLayer(self.convLayer_3)
-        self.poolLayer_3.nextLayer(self.convLayer_4)
 
         # 4. Fourth Conv-Pool Block
-
+        print "fifth conv layer"
         convInputShape_4 = (
-        1, numberOfFilters3, self.poolLayer_3.outputValues.shape[2], self.poolLayer_3.outputValues[3])
-        kernelSizeConv_4 = (filterLength3, 1)
+            1, numberOfFilters3, self.poolLayer_3.outputValues.shape[2], self.poolLayer_3.outputValues.shape[3])
+        kernelSizeConv_4 = (1, filterLength3)
         self.convLayer_4 = Conv2DLayer(convInputShape_4, kernelSizeConv_4, numberOfFilters4, stride=(convStride, 1),
                                        zeroPadding=0, activationFunction='elu', alpha=1)
-
-        self.convLayer_4.previousLayer(self.poolLayer_3)
-        self.convLayer_4.nextLayer(self.poolLayer_4)
 
         poolInputShape_4 = (
         1, numberOfFilters4, self.convLayer_4.outputValues.shape[2], self.convLayer_4.outputValues.shape[3])
@@ -116,7 +97,7 @@ class ConvNet:
                                                     numberOfNeuronsInLayer,
                                                     layerIndex,
                                                     activationFunction='relu',
-                                                    firstLayer=True)
+                                                    firstLayer=True, dropoutProbability=dropProbability)
 
                 self.aFCLayer[layerIndex].__previousLayer(self.poolLayer_4)
                 self.aFCLayer[layerIndex].__nextLayer(layerIndex + 1)
@@ -124,7 +105,7 @@ class ConvNet:
                 self.aFCLayer[layerIndex] = FCLayer(inputShape,
                                                     numberOfNeuronsInLayer,
                                                     layerIndex,
-                                                    activationFunction='relu')
+                                                    activationFunction='relu', dropoutProbability=dropProbability)
 
                 self.aFCLayer[layerIndex].__previousLayer(layerIndex - 1)
                 self.aFCLayer[layerIndex].__nextLayer(layerIndex + 1)
@@ -133,8 +114,29 @@ class ConvNet:
                                                     numberOfClasses,
                                                     layerIndex,
                                                     activationFunction='relu',
-                                                    outputLayer=True)
+                                                    outputLayer=True, dropoutProbability=dropProbability)
                 self.aFCLayer[layerIndex].__previousLayer(layerIndex - 1)
+
+        # Connect Layers
+
+        self.timeConvLayer.nextLayer(self.spaceConvLayer)
+        self.timeConvLayer.previousLayer(None)
+        self.spaceConvLayer.previousLayer(self.timeConvLayer)
+        self.spaceConvLayer.nextLayer(self.poolLayer_1)
+        self.poolLayer_1.previousLayer(self.spaceConvLayer)
+        self.poolLayer_1.nextLayer(self.convLayer_2)
+        self.convLayer_2.previousLayer(self.poolLayer_1)
+        self.convLayer_2.nextLayer(self.poolLayer_2)
+        self.poolLayer_2.previousLayer(self.convLayer_2)
+        self.poolLayer_2.nextLayer(self.convLayer_3)
+        self.convLayer_3.previousLayer(self.poolLayer_2)
+        self.convLayer_3.nextLayer(self.poolLayer_3)
+        self.poolLayer_3.previousLayer(self.convLayer_3)
+        self.poolLayer_3.nextLayer(self.convLayer_4)
+        self.convLayer_4.previousLayer(self.poolLayer_3)
+        self.convLayer_4.nextLayer(self.poolLayer_4)
+        self.poolLayer_4.previousLayer(self.convLayer_4)
+        self.poolLayer_4.nextLayer(self.aFCLayer[0])
 
     def forward(self, someInputValues):
         return self.timeConvLayer.conv2D(someInputValues)
@@ -199,6 +201,25 @@ class Conv2DLayer:
         self.activationFunction = activationFunction
         self.alpha = alpha
 
+        # Computing dimensions of output
+        print self.inputShape[2]
+        print self.kernelSize[0]
+        print self.stride[0]
+        print self.inputShape[3]
+        print self.kernelSize[1]
+        print self.stride[1]
+
+        if self.inputShape[2] == self.kernelSize:
+            outputHeight = self.inputShape[2]
+            outputWidth = (self.inputShape[3] - (self.kernelSize[0]) / self.stride[1] + 1)
+
+            self.outputValues = np.zeros((self.inputShape[0], self.numberOfFilters, outputHeight, outputWidth))
+        else:
+            outputHeight = (self.inputShape[2] + 2 * self.zeroPadding - (self.kernelSize[0]) / self.stride[0] + 1)
+            outputWidth = (self.inputShape[3] + 2 * self.zeroPadding - (self.kernelSize[0]) / self.stride[1] + 1)
+
+            self.outputValues = np.zeros((self.inputShape[0], self.numberOfFilters, outputHeight, outputWidth))
+
     def conv2D(self, someInputs):
 
         """
@@ -233,13 +254,6 @@ class Conv2DLayer:
                                                                                   (self.zeroPadding, self.zeroPadding),
                                                                                   'constant', constant_values=(0, 0))
 
-        # Computing dimensions of output
-        outputHeight = (self.inputShape[2] + 2 * self.zeroPadding - (self.kernelSize[0]) / self.stride[0] + 1)
-        outputWidth = (self.inputShape[3] + 2 * self.zeroPadding - (self.kernelSize[0]) / self.stride[1] + 1)
-
-        self.outputValues = np.zeros((self.inputShape[0], self.numberOfFilters, outputHeight, outputWidth))
-        print self.outputValues.shape
-
         # Do the convolution
         for n in range(self.inputShape[0]):
             for cout in range(self.numberOfFilters):
@@ -251,8 +265,6 @@ class Conv2DLayer:
                             kernel = self.weights[cout, cin, :, :]  # kernel used for the convolution
                             self.outputValues[n, cout, h, w] += np.sum(activationMap * kernel) + self.bias[
                                 cout]  # convolution
-
-        # print self.outputValues
 
         # Applies the activation function to the resultant matrix
         if self.activationFunction is 'relu':  # Applies reLU function
@@ -346,7 +358,9 @@ class Conv2DLayer:
     def getDeltas(self):
         return self.deltas
 
+
 class PoolLayer:
+
     def __init__(self, inputShape, kernelSize, stride):
 
         """
@@ -361,6 +375,18 @@ class PoolLayer:
         self.kernelSize = kernelSize
         self.stride = stride
 
+        # compute dimensions of outputValues
+
+        if self.kernelSize[0] == self.inputShape[2]:
+            outputHeight = self.inputShape[2]
+            outputWidth = ((self.inputShape[3] - self.kernelSize[1]) / self.stride[1] + 1)
+            self.outputValues = np.zeros((self.inputShape[0], self.inputShape[1], outputHeight, outputWidth))
+        else:
+            outputHeight = ((self.inputShape[2] - self.kernelSize[0]) / self.stride[0] + 1)
+            outputWidth = ((self.inputShape[3] - self.kernelSize[1]) / self.stride[1] + 1)
+
+            self.outputValues = np.zeros((self.inputShape[0], self.inputShape[1], outputHeight, outputWidth))
+
     def maxPool2d(self, someInputs):
 
         """
@@ -372,12 +398,6 @@ class PoolLayer:
         self.someInputs = someInputs.reshape(self.inputShape[0], self.inputShape[1], self.inputShape[2],
                                              self.inputShape[3])
 
-        # compute dimensions of outputValues
-
-        outputHeight = ((self.inputShape[2] - self.kernelSize[0]) / self.stride[0] + 1)
-        outputWidth = ((self.inputShape[3] - self.kernelSize[1]) / self.stride[1] + 1)
-
-        self.outputValues = np.zeros((self.inputShape[0], self.inputShape[1], outputHeight, outputWidth))
         self.maxIdx = []
 
         # Do the pooling
@@ -421,112 +441,6 @@ class PoolLayer:
 
     def getDeltas(self):
         return self.deltas
-
-class BatchNormalizationLayer:
-    def __init__(self, inputShape, gamma, beta, eps):
-        """
-        initializes values for the Batch Normalization
-
-        :param inputShape: dimensions of the input
-        :type np.array of dimensions (N, C, H, W)
-        :param gamma:
-        :param beta:
-        :param eps:
-
-        """
-        self.inputShape = inputShape
-        self.gamma = gamma
-        self.beta = beta
-        self.eps = eps
-
-    def forward(self, someInputs):
-        """
-
-        :param someInputs:
-        :return:
-        """
-
-        # step1: calculate mean
-        mu = 1. / someInputs.size * np.sum(someInputs)
-
-        # step2: subtract mean vector of every trainings example
-        xmu = someInputs - mu
-
-        # step3: following the lower branch - calculation denominator
-        sq = xmu ** 2
-
-        # step4: calculate variance
-        var = 1. / someInputs.size * np.sum(sq)
-
-        # step5: add eps for numerical stability, then sqrt
-        sqrtvar = np.sqrt(var + self.eps)
-
-        # step6: invert sqrtvar
-        ivar = 1. / sqrtvar
-
-        # step7: execute normalization
-        xhat = xmu * ivar
-
-        # step8: Nor the two transformation steps
-        gammax = self.gamma * xhat
-
-        # step9
-        self.outputValues = gammax + self.beta
-
-        # store intermediate
-        self.cache = (xhat, self.gamma, xmu, ivar, sqrtvar, var, self.eps)
-
-        return self.outputValues, self.cache
-
-    def backward(self):
-        # unfold the variables stored in cache
-        xhat, gamma, xmu, ivar, sqrtvar, var, eps = self.cache
-
-        deltasNext = self.__nextLayer.deltas
-        N, C, H, W = deltasNext.size
-
-        # step9
-        dbeta = np.sum(self.__nextLayer.deltas, axis=0)
-        dgammax = self.__nextLayer.deltas  # not necessary, but more understandable
-
-        # step8
-        dgamma = np.sum(dgammax * xhat, axis=0)
-        dxhat = dgammax * gamma
-
-        # step7
-        divar = np.sum(dxhat * xmu, axis=0)
-        dxmu1 = dxhat * ivar
-
-        # step6
-        dsqrtvar = -1. / (sqrtvar ** 2) * divar
-
-        # step5
-        dvar = 0.5 * 1. / np.sqrt(var + self.eps) * dsqrtvar
-
-        # step4
-        dsq = 1. / deltasNext.size * np.ones((N, C, H, W)) * dvar
-
-        # step3
-        dxmu2 = 2 * xmu * dsq
-
-        # step2
-        dx1 = (dxmu1 + dxmu2)
-        dmu = -1 * np.sum(dxmu1 + dxmu2, axis=0)
-
-        # step1
-        dx2 = 1. / N * np.ones((N, C, H, W)) * dmu
-
-        # step0
-        self.deltas = dx1 + dx2
-
-        return self.deltas, dgamma, dbeta
-
-    def nextLayer(self, aLayer):
-        self.__nextLayer = aLayer
-
-    def previousLayer(self, aLayer):
-        self.__previousLayer = aLayer
-
 
 class FCLayer:
     def __init__(self, inputShape, numberOfNeuronsInLayer, layerIndex, activationFunction, dropoutProbability, alpha=1,

@@ -3,7 +3,7 @@ import BCICompetition4 as BCI
 import numpy as np
 import mne
 import time
-
+import matplotlib
 
 class EEGDecoding:
     def __init__(self, numberOfSubjects):
@@ -60,6 +60,7 @@ class EEGDecoding:
         inputTimeLength = trainDataSet.shape[3]
         numberOfClasses = 4
 
+        print "Initializing Convolutional Neural Network"
         ConvNetwork = nn.ConvNet(inputChannels, numberOfClasses, inputTimeLength)
 
         for s in range(eegData.shape[0]):  # number of subjects
