@@ -1,7 +1,8 @@
 import numpy as np
-import time
+
 
 class ConvNet:
+
     def __init__(self,
                  inputChannels,  # input Channels from the EEG
                  numberOfClasses,  # number of Classes
@@ -19,7 +20,7 @@ class ConvNet:
                  convStride=1,
                  numberOfFCLayers=2,
                  numberOfNeuronsInLayer=200,
-                 dropProbability=0.5  # probability used for drop out
+                 dropoutProbability=0.5  # probability used for drop out
                  ):
 
         # 1. First Conv-Pool Block
@@ -88,36 +89,43 @@ class ConvNet:
 
         # 5. Classification Layer
         self.numberOfFCLayers = numberOfFCLayers
-        self.aFCLayer = np.zeros(numberOfFCLayers)
+        self.aFCLayer = [[] for i in range(numberOfFCLayers)]
 
         for layerIndex in range(numberOfFCLayers):
-            inputShape = self.aFCLayer[layerIndex].__previousLayer.outputValues.shape
-            while layerIndex is 0:
+
+            if layerIndex is 0:
+
+                input_i = np.squeeze(self.poolLayer_4.outputValues)
+                inputShape_i = input_i.shape
+                inputShape = input_i.reshape(inputShape_i[0] * inputShape_i[1]).flatten().shape[0]
+
+                print "initializing first full connected layer"
                 self.aFCLayer[layerIndex] = FCLayer(inputShape,
                                                     numberOfNeuronsInLayer,
                                                     layerIndex,
+                                                    dropoutProbability,
                                                     activationFunction='relu',
-                                                    firstLayer=True, dropoutProbability=dropProbability)
+                                                    firstLayer=True)
 
-                self.aFCLayer[layerIndex].__previousLayer(self.poolLayer_4)
-                self.aFCLayer[layerIndex].__nextLayer(layerIndex + 1)
-            while 0 < layerIndex < numberOfFCLayers - 1:
-                self.aFCLayer[layerIndex] = FCLayer(inputShape,
+            elif 0 < layerIndex < (numberOfFCLayers - 1):
+                print "initializing second full connected layer"
+
+                self.aFCLayer[layerIndex] = FCLayer(numberOfNeuronsInLayer,
                                                     numberOfNeuronsInLayer,
                                                     layerIndex,
-                                                    activationFunction='relu', dropoutProbability=dropProbability)
+                                                    dropoutProbability,
+                                                    activationFunction='relu')
 
-                self.aFCLayer[layerIndex].__previousLayer(layerIndex - 1)
-                self.aFCLayer[layerIndex].__nextLayer(layerIndex + 1)
-            while layerIndex is numberOfFCLayers:
-                self.aFCLayer[layerIndex] = FCLayer(inputShape,
+            else:
+                print "initializing ouput Layer"
+                self.aFCLayer[layerIndex] = FCLayer(numberOfNeuronsInLayer,
                                                     numberOfClasses,
                                                     layerIndex,
+                                                    dropoutProbability,
                                                     activationFunction='relu',
-                                                    outputLayer=True, dropoutProbability=dropProbability)
-                self.aFCLayer[layerIndex].__previousLayer(layerIndex - 1)
+                                                    outputLayer=True)
 
-        # Connect Layers
+        # Connecting Layers
 
         self.timeConvLayer.nextLayer(self.spaceConvLayer)
         self.timeConvLayer.previousLayer(None)
@@ -138,7 +146,22 @@ class ConvNet:
         self.poolLayer_4.previousLayer(self.convLayer_4)
         self.poolLayer_4.nextLayer(self.aFCLayer[0])
 
+        for layerIndex in range(numberOfFCLayers):
+
+            if layerIndex is 0:
+                print self.aFCLayer[0]
+                print self.aFCLayer[1]
+                self.aFCLayer[layerIndex].previousLayer(self.poolLayer_4)
+                self.aFCLayer[layerIndex].nextLayer(self.aFCLayer[layerIndex + 1])
+            elif 0 < layerIndex < numberOfFCLayers - 1:
+                self.aFCLayer[layerIndex].previousLayer(self.aFCLayer[layerIndex - 1])
+                self.aFCLayer[layerIndex].nextLayer(self.aFCLayer[layerIndex + 1])
+            else:
+                self.aFCLayer[layerIndex].previousLayer(self.aFCLayer[layerIndex - 1])
+                self.aFCLayer[layerIndex].nextLayer(None)
+
     def forward(self, someInputValues):
+        print "We are now in the forward step"
         return self.timeConvLayer.conv2D(someInputValues)
 
     def backward(self, expectedValues):
@@ -151,13 +174,11 @@ class ConvNet:
         pass
 
     def training(self, someInputValues, expectedValues, learningRate):
-        timeA = time.time()
+
+        print "Training phase started"
         self.forward(someInputValues)
         self.backward(expectedValues)
         self.updateParameters(learningRate)
-        timeB = time.time()
-        Error = np.subtract(expectedValues, self.forward(someInputValues))
-        print 'the training took ' + str(timeB - timeA) + ' seconds'
 
     def test(self):
         pass
@@ -202,12 +223,6 @@ class Conv2DLayer:
         self.alpha = alpha
 
         # Computing dimensions of output
-        print self.inputShape[2]
-        print self.kernelSize[0]
-        print self.stride[0]
-        print self.inputShape[3]
-        print self.kernelSize[1]
-        print self.stride[1]
 
         if self.inputShape[2] == self.kernelSize:
             outputHeight = self.inputShape[2]
@@ -232,6 +247,8 @@ class Conv2DLayer:
         :type OutputValues: np.array
         """
         self.someInputs = someInputs
+        print someInputs.shape
+        print self.outputValues.shape
 
         #  Adds Zero Padding
         if self.zeroPadding is 0:  # no padding added
@@ -266,6 +283,7 @@ class Conv2DLayer:
                             self.outputValues[n, cout, h, w] += np.sum(activationMap * kernel) + self.bias[
                                 cout]  # convolution
 
+        print self.outputValues
         # Applies the activation function to the resultant matrix
         if self.activationFunction is 'relu':  # Applies reLU function
             return self.relu(self.outputValues)
@@ -442,14 +460,15 @@ class PoolLayer:
     def getDeltas(self):
         return self.deltas
 
+
 class FCLayer:
-    def __init__(self, inputShape, numberOfNeuronsInLayer, layerIndex, activationFunction, dropoutProbability, alpha=1,
+    def __init__(self, inputShape, numberOfNeuronsInLayer, layerIndex, dropoutProbability, activationFunction, alpha=1,
                  trainMode=False, outputLayer=False, firstLayer=False):
 
         self.numberOfNeurons = numberOfNeuronsInLayer
         self.activationFunction = activationFunction
-        self.weights = np.random.rand((numberOfNeuronsInLayer, inputShape))
-        self.biases = np.random.rand(numberOfNeuronsInLayer)
+        self.weights = np.random.rand(numberOfNeuronsInLayer, inputShape)
+        self.biases = np.random.rand(inputShape)
         self.deltaWeights = np.zeros(self.weights.shape)
         self.deltaBias = np.zeros(self.biases.shape)
         self.alpha = alpha
@@ -458,10 +477,13 @@ class FCLayer:
         self.layerIndex = layerIndex
         self.inputShape = inputShape
         self.trainMode = trainMode
-        self.dropoutVector = np.random.binomial(1, dropoutProbability, size=numberOfNeuronsInLayer) / dropoutProbability
+        self.dropoutProbability = dropoutProbability
+        self.dropoutVector = np.random.binomial(1, self.dropoutProbability,
+                                                size=numberOfNeuronsInLayer) / self.dropoutProbability
 
     def forward(self, someInputs):
-
+        someInputs_i = np.squeeze(someInputs)
+        someInputs = someInputs.reshape(someInputs_i[0] * someInputs_i[1])
         z = np.dot(self.weights, someInputs) + self.biases
 
         if self.trainMode is False:

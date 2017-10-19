@@ -22,6 +22,9 @@ class EEGDecoding:
         loadinit = time.time()
         Raw = [[] for i in range(self.numberOfSubjects - 1)]
         events = [[] for i in range(self.numberOfSubjects - 1)]
+        eegEpochsArray = [[] for i in range(self.numberOfSubjects - 1)]
+        eegData = np.zeros((self.numberOfSubjects, 288, 26, 176))
+        eventsArray = np.zeros((self.numberOfSubjects, 288))
 
         # create list with raw and events
 
@@ -29,10 +32,14 @@ class EEGDecoding:
         for i in np.arange(1, self.numberOfSubjects, 1):
             datafile = './BCICIV_2a_gdf/A0' + str(i) + 'T.gdf'  # directory
             Raw[j], events[j] = BCI.BCICompetition4Set2A(datafile).load()  # load raw data with removed artifacts
+            while i is 1:
+                eventsArray_i = np.squeeze(np.asanyarray(events, list)[:, 2:3])
+                eventsArray[j, :] = [self.numberOfSubjects, eventsArray_i]
+            while i > 1:
+                eventsArray_i = np.squeeze(np.asanyarray(events[j], list)[:, 2:3])
+                eventsArray[j, :] = [self.numberOfSubjects, eventsArray_i]
             j += 1
 
-        eegEpochsArray = [[] for i in range(self.numberOfSubjects - 1)]
-        eegData = np.zeros((self.numberOfSubjects, 288, 26, 176))
         # gets a 4D array with dimensions [Subject, Event, EEGChannel, Time]
 
         for i in range(self.numberOfSubjects - 1):
@@ -41,7 +48,7 @@ class EEGDecoding:
             eegData[i, :, :] = eegEpochsArray[i].get_data()
 
         eegData = eegData[:, :, 0:22, :]  # just 22 electrodes are for recording
-        labels = np.array([[item[2] for item in events[i]] for i in range(self.numberOfSubjects - 1)])
+        labels = eventsArray
 
         print eegData.shape
         print labels.shape
@@ -54,7 +61,7 @@ class EEGDecoding:
     def train(self, eegData, events):
 
         trainDataSet = eegData[:, ::2, :, :]  # even  - start at the beginning at take every second item
-        trainLabels = events[:, ::2]
+        trainLabels = labels[:, ::2]
 
         inputChannels = trainDataSet.shape[2]  # odd - start at second item and take every second item
         inputTimeLength = trainDataSet.shape[3]
@@ -65,16 +72,17 @@ class EEGDecoding:
 
         for s in range(eegData.shape[0]):  # number of subjects
             for e in range(eegData.shape[1]):  # number of events
+                print trainDataSet[s, e, :, :].shape
                 ConvNetwork.training(trainDataSet[s, e, :, :], trainLabels[s, e], learningRate=0.05)
 
     def test(self, eegData, events):
         testDataSet = eegData[:, 1::2, :, :]
-        testLabels = events[:, 1::2]
+        testLabels = labels[:, 1::2]
         pass
 
 
-eegData, labels = EEGDecoding(9).loadData()  # funciona
-X = EEGDecoding(9).train(eegData, labels)
+eegData, labels = EEGDecoding(1).loadData()  # funciona
+X = EEGDecoding(1).train(eegData, labels)
 
 """file = './BCICIV_2a_gdf/A01T.gdf' # directory
 A01T_raw, events  = BCI.BCICompetition4Set2A(file).load() #  load raw data with removed artifacts

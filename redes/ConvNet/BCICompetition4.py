@@ -4,12 +4,10 @@ from scipy.io import loadmat
 
 
 class BCICompetition4Set2A(object):
-    def __init__(self, filename, load_sensor_names=None,
-                 labels_filename=None):
-        assert load_sensor_names is None
+    def __init__(self, filename):
+
         self.filename = filename
-        self.load_sensor_names = load_sensor_names
-        self.labels_filename = labels_filename
+
 
     def load(self):
         data = self.extractData()
@@ -21,6 +19,7 @@ class BCICompetition4Set2A(object):
     def extractData(self):
         rawData = mne.io.read_raw_edf(self.filename, stim_channel='auto')
         rawData.load_data()
+
         # correct nan values
 
         data = rawData.get_data()
@@ -56,15 +55,12 @@ class BCICompetition4Set2A(object):
             "Got {:d} markers".format(len(trial_events)))
         # event markers 769,770 -> 1,2
         trial_events[:, 1] = trial_events[:, 1] - 768
-        # possibly overwrite with markers from labels file
-        if self.labels_filename is not None:
-            classes = loadmat(self.labels_filename)['classlabel'].squeeze()
-            trial_events[:, 1] = classes
+
         unique_classes = np.unique(trial_events[:, 1])
         assert np.array_equal([1, 2, 3, 4], unique_classes), (
             "Expect 1,2,3,4 as class labels, got {:s}".format(
-                str(unique_classes))
-        )
+                str(unique_classes)))
+
         # now also create 0-1 vector for rejected trials
         trial_start_events = events[events[:, 1] == 768]
         assert len(trial_start_events) == len(trial_events)
