@@ -1,13 +1,11 @@
 import numpy as np
 import mne
-from scipy.io import loadmat
 
 
 class BCICompetition4Set2A(object):
     def __init__(self, filename):
 
         self.filename = filename
-
 
     def load(self):
         data = self.extractData()
