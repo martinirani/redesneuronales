@@ -51,6 +51,7 @@ class BCICompetition4Set2A(object):
         trial_events = events[trial_mask]
         assert (len(trial_events) == 288), (
             "Got {:d} markers".format(len(trial_events)))
+
         # event markers 769,770 -> 1,2
         trial_events[:, 1] = trial_events[:, 1] - 768
 

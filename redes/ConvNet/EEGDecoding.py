@@ -61,6 +61,12 @@ class EEGDecoding:
         return eegData, labels
 
     def train(self, eegData, labels):
+        """
+
+        :param eegData:
+        :param labels:
+        :return:
+        """
 
         trainDataSet = eegData[:, ::2, :, :]  # even  - start at the beginning at take every second item
         trainLabels = labels[:, ::2]
@@ -71,29 +77,30 @@ class EEGDecoding:
 
         print "Initializing Convolutional Neural Network"
 
-        ConvNetwork = nn.ConvNet(inputChannels, numberOfClasses, inputTimeLength)
+        self.ConvNetwork = nn.ConvNet(inputChannels, numberOfClasses, inputTimeLength)
 
         for s in range(eegData.shape[0]):  # number of subjects
             for e in range(eegData.shape[1]):  # number of events
-                print trainLabels[s, e]
-                ConvNetwork.training(trainDataSet[s, e, :, :], trainLabels[s, e], learningRate=0.05)
+                self.ConvNetwork.training(trainDataSet[s, e, :, :], trainLabels[s, e], learningRate=0.05)
 
-    def test(self, eegData):
+                # Dame una learning Curve
+
+    def test(self, eegData, labels):
+        """
+
+        :param eegData:
+        :return:
+        """
 
         testDataSet = eegData[:, 1::2, :, :]
         testLabels = labels[:, 1::2]
 
-        inputChannels = testDataSet.shape[2]  # odd - start at second item and take every second item
-        inputTimeLength = testDataSet.shape[3]
-        numberOfClasses = 4
-
-        ConvNetwork = nn.ConvNet(inputChannels, numberOfClasses, inputTimeLength)
-
         for s in range(eegData.shape[0]):  # number of subjects
             for e in range(eegData.shape[1]):  # number of events
                 print testDataSet[s, e, :, :].shape
-                ConvNetwork.forward(testDataSet[s, e, :, :])
-        pass
+                self.ConvNetwork.test(testDataSet[s, e, :, :], testLabels[s, e])
+
 
 eegData, labels = EEGDecoding(1).loadData()
-X = EEGDecoding(1).train(eegData, labels)
+EEGDecoding(1).train(eegData, labels)
+EEGDecoding(1).test(eegData, labels)

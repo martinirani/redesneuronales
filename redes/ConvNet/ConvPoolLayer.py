@@ -82,6 +82,7 @@ class ConvNet:
         poolKernelSize_3 = (1, poolTimeLength)
         self.poolLayer_3 = PoolLayer(poolInputShape_3, poolKernelSize_3, stride=(1, poolTimeStride))
 
+
         # 4. Fourth Conv Block
         print "intializing fourth convolutional Layer"
         convInputShape_4 = (
@@ -149,8 +150,6 @@ class ConvNet:
         for layerIndex in range(numberOfFCLayers):
 
             if layerIndex is 0:
-                print self.aFCLayer[0]
-                print self.aFCLayer[1]
                 self.aFCLayer[layerIndex].previousLayer(self.convLayer_4)
                 self.aFCLayer[layerIndex].nextLayer(self.aFCLayer[layerIndex + 1])
             elif 0 < layerIndex < numberOfFCLayers - 1:
@@ -162,6 +161,8 @@ class ConvNet:
 
     def forward(self, someInputValues):
         print "We are now in the forward step"
+        someInputValues -= np.mean(someInputValues)
+        someInputValues /= np.std(someInputValues)
         self.timeConvLayer.forward(someInputValues)
 
     def backward(self, expectedValues):
@@ -178,16 +179,17 @@ class ConvNet:
         self.updateParameters(learningRate)
 
     def test(self, testInputValues, labels):
-        self.forward(testInputValues)
-        self.confusalMatrix()
+        outputs = self.forward(testInputValues)
+        self.confusalMatrix(outputs, labels)
 
-    def confusalMatrix(self, testInputValues, labels):
+    def confusalMatrix(self, outputValues, labels):
         pass
 
     def learningCurve(self, testInputValues, labels):
         pass
 
 class Conv2DLayer:
+
     def __init__(self, inputShape, kernelSize, numberOfFilters, stride, zeroPadding, activationFunction, alpha=1,
                  spaceConv=False):
 
@@ -214,8 +216,8 @@ class Conv2DLayer:
         self.__dict__.update(locals())
         del self.self
 
-        self.weights = np.random.rand(numberOfFilters, self.inputShape[1], self.kernelSize[0],
-                                       self.kernelSize[1])  # initializes random values for the kernels
+        self.weights = np.random.rand(numberOfFilters, self.kernelSize[0],
+                                      self.kernelSize[1])  # initializes random values for the kernels
         self.bias = np.random.rand(numberOfFilters)  # initializes random values for the biases
 
         # Computing dimensions of output
@@ -229,11 +231,7 @@ class Conv2DLayer:
             outputHeight = (self.inputShape[2] + 2 * self.zeroPadding - (self.kernelSize[0]) / self.stride[0] + 1)
             outputWidth = (self.inputShape[3] + 2 * self.zeroPadding - (self.kernelSize[1]) / self.stride[1] + 1)
 
-            print outputHeight
-            print outputWidth
-
             self.outputValues = np.zeros((self.inputShape[0], self.numberOfFilters, outputHeight, outputWidth))
-            self.deltas = []
 
     def forward(self, someInputs):
 
@@ -247,16 +245,14 @@ class Conv2DLayer:
         :type OutputValues: np.array
         """
 
-        print "The shape of the Input is " + str(someInputs.shape)
-        print "aaaaand the ouput " + str(self.outputValues.shape)
-
         if self.spaceConv is True:
             someInputs = self.SpaceConvMatrixTranspose(someInputs)
         else:
             someInputs = np.reshape(someInputs, (self.inputShape))
 
-        print someInputs.shape
-        print self.inputShape
+        print "The shape of the Input is " + str(someInputs.shape)
+        print "aaaaand the ouput " + str(self.outputValues.shape)
+
         assert someInputs.shape == self.inputShape
 
         #  Adds Zero Padding
@@ -282,7 +278,7 @@ class Conv2DLayer:
                                                                                   'constant', constant_values=(0, 0))
 
         # Do the convolution
-        print "convolution started baby"
+        print "It's convolution, baby"
         timeA = time.time()
         for n in range(self.inputShape[0]):
             for cout in range(self.numberOfFilters):
@@ -293,11 +289,11 @@ class Conv2DLayer:
                         for w in np.arange(0, self.inputShape[3] - self.kernelSize[1] + 1, self.stride[1]):
                             activationMap = self.inputs[n, cin, h:h + self.kernelSize[0],
                                             w:w + self.kernelSize[1]]  # Portion of the input feature map convolved
-                            kernel = self.weights[cout, cin, :, :]  # kernel used for the convolution
-                            self.outputValues[n, cout, nh, nw] += np.sum(activationMap * kernel) + self.bias[
+                            kernel = self.weights[cout, :, :]  # kernel used for the convolution
+                            self.outputValues[n, cout, nh, nw] = np.sum(activationMap * kernel) + self.bias[
                                 cout]  # convolution
-                        nw += 1
-                    nh += 1
+                            nw += 1
+                        nh += 1
 
         timeB = time.time()
 
@@ -332,47 +328,98 @@ class Conv2DLayer:
             else:
                 return self.__nextLayer.forward(self.outcome)
 
-
-    def backPropagationConvLayer(self):
+    def backpropagation(self):
 
         """
         backward pass of Conv layer.
 
-        :param deltasNext: derivatives from next layer of shape (N, K, WF, HF)
+        :param deltasNext: derivatives from next layer of shape (N, K, HF, WF)
         :type deltasNext: np.array
 
         :return self.deltaWeights
         :return self.deltaBiases
          """
 
+        print "backpropagation in Convlayer"
+
+        if self.__nextLayer.__class__.__name__ is 'FCLayer':
+            NNext = 1
+            KNext = 1
+            WF = self.__nextLayer.numberOfNeuronsInLayer
+            HF = 1
+            dNext = np.reshape(self.__nextLayer.getDeltas(), (NNext, KNext, HF, WF))
+        else:
+            dNext = self.__nextLayer.getDeltas()
+
+        self.deltas = np.zeros(self.outputValues.shape)
+
         # Compute Deltas
-        for n in range(self.inputShape[0]):
-            for nf in range(self.numberOfFilters):
-                deltas_i = self.activationFunctionDerivative(self.inputs[n, nf], self.activationFunction) * \
-                           self.__nextLayer.getDeltas()[n][nf]
-                self.deltas.append(deltas_i)
+        if self.__nextLayer.__class__.__name__ is 'FCLayer':
+            for n in range(self.outputValues.shape[0]):
+                for nf in range(self.numberOfFilters):
+                    for h in range(self.outputValues.shape[2]):
+                        for w in range(self.outputValues.shape[3]):
+                            deltas_i = self.activationFunctionDerivative(self.outputValues)[n, nf, h, w] * dNext[
+                                0, 0, 0, nf]
+                            self.deltas[n, nf, h, w] += deltas_i
+
+        else:
+            for n in range(self.outputValues.shape[0]):
+                for nf in range(self.numberOfFilters):
+                    for h in range(self.outputValues.shape[2]):
+                        for w in range(self.outputValues.shape[3]):
+                            deltas_i = self.activationFunctionDerivative(self.outputValues)[n, nf, h, w] * \
+                                       dNext[n, nf, h, w]
+                            self.deltas[n, nf, h, w] += deltas_i
+
+        print "shape of delta is " + str(self.deltas.shape)
+        print self.deltas.shape
+
+        if self.spaceConv is True:
+            self.deltas = np.transpose(self.deltas, (3, 1, 2, 0))
+        else:
+            pass
 
         # Compute delta Biases
-        deltaBiases = []
-        for delta in self.deltas:
-            deltaBiases.append(np.sum(delta))
+        deltaBiases = (np.sum(self.deltas, axis=(0, 2, 3)))
+        assert deltaBiases.shape == self.bias.shape
 
-            # Compute delta Kernels
-        deltaKernel = np.zeros(self.weights)
+        # Compute delta Kernels
 
-        for n in range(self.inputShape[0]):
+        deltaKernel = np.zeros(self.weights.shape)
+        print deltaKernel.shape
+        print self.inputShape
+
+        print self.deltas.shape
+
+        for ninp in range(self.inputShape[0]):
             for nf in range(self.numberOfFilters):
-                flippedDelta = self.flipArray(self.deltas[n, nf, :, :])  # Flips Kernel for the convolution
+                flippedDelta = self.flipArray(self.deltas[ninp, nf, :, :])  # Flips Kernel for the convolution
                 for cin in range(self.inputShape[1]):
-                    for w in np.arange(0, self.inputs.shape[3] - self.kernelSize[1] + 1, self.stride[1]):
-                        for h in np.arange(0, self.inputs.shape[2] - self.kernelSize[0] + 1, self.stride[0]):
-                            activationMap = self.inputs[n, cin, h, w]  # Input Map used for the convolution
-                            deltaKernel[n, nf, h, w] = np.sum(activationMap * flippedDelta)  # Convolution
+                    nh = 0
+                    for h in np.arange(0, self.inputs.shape[2] - flippedDelta.shape[0] + 1, self.stride[0]):
+                        nw = 0
+                        for w in np.arange(0, self.inputs.shape[3] - flippedDelta.shape[1] + 1, self.stride[1]):
+                            activationMap = self.inputs[ninp, cin,
+                                            h:h + flippedDelta.shape[0],
+                                            w:w + flippedDelta.shape[1]]  # Input Map used for the convolution
+                            deltaKernel[nf, nh, nw] = np.sum(activationMap * flippedDelta)  # Convolution
+                            nw += 1
+                        nh += 1
+
+        if self.spaceConv is True:
+            self.deltas = np.transpose(self.deltas, (3, 1, 2, 0))
+        else:
+            pass
 
         self.deltaWeights = deltaKernel
         self.deltaBiases = deltaBiases
 
-        return self.deltas, self.deltaWeights, self.deltaBiases
+        if self.__previousLayer is None:
+            return self.deltas, self.deltaWeights, self.deltaBiases
+        else:
+            return self.__previousLayer.backpropagation()
+
 
     def updateParams(self, learningRate):
         """
@@ -396,14 +443,17 @@ class Conv2DLayer:
         self.outputs = 1 / (1 + np.exp(-outputValues))
         return self.outputs
 
-    def activationFunctionDerivative(self, outputValues, activationFunction):
-        if activationFunction is 'sigmoid':
+    def activationFunctionDerivative(self, outputValues):
+        if self.activationFunction is 'sigmoid':
             self.transferDerivative = outputValues * (1 - outputValues)
             return self.transferDerivative
-        if activationFunction is 'relu':
+        if self.activationFunction is 'relu':
             self.transferDerivative = 1. * (outputValues > 0)
-        if activationFunction is 'elu':
-            self.transferDerivative = (outputValues < 0) * self.elu(outputValues, self.alpha) + self.alpha
+            return self.transferDerivative
+        if self.activationFunction is 'elu':
+            self.transferDerivative = np.multiply(np.maximum(outputValues, 0),
+                                                  self.elu(outputValues, self.alpha)) + self.alpha
+            return self.transferDerivative
 
     def nextLayer(self, aLayer):
         self.__nextLayer = aLayer
@@ -418,6 +468,11 @@ class Conv2DLayer:
         return self.deltas
 
     def SpaceConvMatrixTranspose(self, someInputValues):
+        """
+
+        :param someInputValues:
+        :return:
+        """
         transposedValues = np.transpose(someInputValues, (3, 1, 0, 2))
         return transposedValues
 
@@ -449,7 +504,6 @@ class PoolLayer:
             self.outputValues = np.zeros((self.inputShape[0], self.inputShape[1], outputHeight, outputWidth))
 
     def forward(self, someInputs):
-
 
         """
         :param someInputs: input Values of dimensions [numberOfInputs, Height, Width]
@@ -489,7 +543,7 @@ class PoolLayer:
         else:
             return self.__nextLayer.forward(self.outputValues)
 
-    def backPropagationMaxPool(self, deltasNext):
+    def backpropagation(self):
 
         """
         Computes the backward pass of MaxPool Layer.
@@ -497,20 +551,25 @@ class PoolLayer:
         delta: delta values of shape (N, D, H/factor, W/factor)
         """
 
-        self.deltas = np.zeros_like(self.someInputs)
-        print self.deltas.shape
+        print "backpropagation in pool layer"
+        deltasNext = self.__nextLayer.getDeltas()
+        self.deltas = np.zeros(self.inputShape)
+
         # for para dar los valores del delta siguiente a los maximos
         idx = 0
         for n in range(self.inputShape[0]):
             for c in range(self.inputShape[1]):
-                for w in range(deltasNext.shape[3]):
-                    for h in range(deltasNext.shape[2]):
-                        self.deltas[n, c, self.maxIdx[idx][0], self.maxIdx[idx][1]] = self.__nextLayer.getDeltas()[
-                            n, c, h, w]
+                for h in range(self.inputShape[2], self.inputShape[2] - self.kernelSize[0] + 1, self.stride[0]):
+                    for w in range(self.inputShape[3], self.inputShape[3] - self.kernelSize[1] + 1, self.stride[1]):
+                        self.deltas[n, c, self.maxIdx[idx][0], self.maxIdx[idx][1]] = deltasNext[
+                                                                                      n, c, h: h + self.kernelSize[0],
+                                                                                      w:w + self.kernelSize[1]]
                         idx += 1
 
-        self.deltas = self.deltas
-        return self.deltas
+        if self.__previousLayer is None:
+            return self.deltas
+        else:
+            return self.__previousLayer.backpropagation()
 
     def nextLayer(self, aLayer):
         self.__nextLayer = aLayer
@@ -526,6 +585,18 @@ class FCLayer:
     def __init__(self, numberOfInputs, numberOfNeuronsInLayer, layerIndex, dropoutProbability, activationFunction,
                  alpha=1,
                  trainMode=False, outputLayer=False, firstLayer=False):
+        """
+
+        :param numberOfInputs:
+        :param numberOfNeuronsInLayer:
+        :param layerIndex:
+        :param dropoutProbability:
+        :param activationFunction:
+        :param alpha:
+        :param trainMode:
+        :param outputLayer:
+        :param firstLayer:
+        """
 
         self.__dict__.update(locals())
         del self.self
@@ -538,13 +609,16 @@ class FCLayer:
                                                 size=numberOfNeuronsInLayer) / self.dropoutProbability
 
     def forward(self, someInputs):
+        """
+
+        :param someInputs:
+        :return:
+        """
         print "we are in a FC layer"
         print "The number of the Input is " + str(self.numberOfInputs)
 
         someInputs = someInputs.reshape(self.numberOfInputs)
         z = np.dot(someInputs, self.weights.T) + self.biases
-
-        print z
 
         if self.trainMode is False:
 
@@ -557,13 +631,11 @@ class FCLayer:
             elif self.activationFunction is 'softmax':
                 self.outputValues = self.softmax(z)
 
-            print self.outputValues
 
             if self.outputLayer is True:
                 print self.outputValues
                 return self.outputValues
             else:
-                print self.outputValues
                 return self.__nextLayer.forward(self.outputValues)
 
         elif self.trainMode is True:
@@ -583,32 +655,45 @@ class FCLayer:
                 print self.outputValues
                 return self.outputValues
             else:
-                print self.outputValues
                 return self.__nextLayer.forward(self.outputValues)
 
     def backpropagation(self, expectedValues):
+        """
+
+        :param expectedValues:
+        :return:
+        """
 
         if self.trainMode is False:
+
             if self.outputLayer is True:
-                Error = np.subtract(self.outputValues, expectedValues)
-                self.deltas = Error * self.activationFunctionDerivative(self.outputValues, self.activationFunction)
-                return self.__previousLayer.backPropagation(None)
+                Error = self.error(self.outputValues, expectedValues)
+                self.deltas = np.multiply(Error, self.activationFunctionDerivative(self.outputValues))
+                print self.deltas
+                return self.__previousLayer.backpropagation(None)
 
             elif self.firstLayer is False and self.outputLayer is False:
                 weightsNextLayer = self.__nextLayer.getWeights()
                 deltasNextLayer = self.__nextLayer.getDeltas()
                 self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
-                return self.__previousLayer.backPropagation(None)
+                return self.__previousLayer.backpropagation(None)
+
             else:
-                weightsNextLayer = self.__nextLayer.getWeights()
-                deltasNextLayer = self.__nextLayer.getDeltas()
-                self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
-                return self.deltas
+                if self.__previousLayer is None:
+                    weightsNextLayer = self.__nextLayer.getWeights()
+                    deltasNextLayer = self.__nextLayer.getDeltas()
+                    self.deltas = np.dot(weightsNextLayer.T, deltasNextLayer)
+                    return self.deltas
+                else:
+                    weightsNextLayer = self.__nextLayer.getWeights()
+                    deltasNextLayer = self.__nextLayer.getDeltas()
+                    self.deltas = np.dot(weightsNextLayer.T, deltasNextLayer)
+                    return self.__previousLayer.backpropagation()
 
         elif self.trainMode is True:
             if self.outputLayer is True:
                 Error = np.subtract(self.outputValues, expectedValues)
-                self.deltas = Error * self.activationFunctionDerivative(self.outputValues, self.activationFunction)
+                self.deltas = Error * self.activationFunctionDerivative(self.outputValues)
                 self.deltas *= self.dropoutVector
                 return self.__previousLayer.backPropagation(None)
 
@@ -617,15 +702,28 @@ class FCLayer:
                 deltasNextLayer = self.__nextLayer.getDeltas()
                 self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
                 self.deltas *= self.dropoutVector
-                return self.__previousLayer.backPropagation(None)
+                return self.__previousLayer.backpropagation(None)
             else:
-                weightsNextLayer = self.__nextLayer.getWeights()
-                deltasNextLayer = self.__nextLayer.getDeltas()
-                self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
-                self.deltas *= self.dropoutVector
-                return self.deltas
+
+                if self.__previousLayer is None:
+                    weightsNextLayer = self.__nextLayer.getWeights()
+                    deltasNextLayer = self.__nextLayer.getDeltas()
+                    self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
+                    self.deltas *= self.dropoutVector
+                    return self.deltas
+                else:
+                    weightsNextLayer = self.__nextLayer.getWeights()
+                    deltasNextLayer = self.__nextLayer.getDeltas()
+                    self.deltas = np.dot(weightsNextLayer.T, deltasNextLayer)
+                    return self.__previousLayer.backpropagation()
 
     def updateParameters(self, someInputs, learningRate):
+        """
+
+        :param someInputs:
+        :param learningRate:
+        :return:
+        """
 
         if self.firstLayer is True:
             self.deltaBiases = learningRate * self.deltas
@@ -653,16 +751,26 @@ class FCLayer:
             self.weights += self.deltaWeights
             self.biases += self.deltaBiases
 
-    def activationFunctionDerivative(self, outputValues, activationFunction):
-        if activationFunction is 'sigmoid':
+    def activationFunctionDerivative(self, outputValues):
+        """
+
+        :param outputValues:
+        :return:
+        """
+        if self.activationFunction is 'sigmoid':
             self.transferDerivative = outputValues * (1 - outputValues)
             return self.transferDerivative
-        if activationFunction is 'relu':
+        if self.activationFunction is 'relu':
             self.transferDerivative = 1. * (outputValues > 0)
-        if activationFunction is 'elu':
+            return self.transferDerivative
+        if self.activationFunction is 'elu':
             self.transferDerivative = (outputValues < 0) * self.elu(outputValues, self.alpha) + self.alpha
-        if activationFunction is 'sofmax':
-            pass
+            return self.transferderivative
+        if self.activationFunction is 'softmax':
+            self.transferDerivative = outputValues * (1 - outputValues)
+            print self.transferDerivative
+            return self.transferDerivative
+
 
     def nextLayer(self, aLayer):
         self.__nextLayer = aLayer
@@ -692,3 +800,20 @@ class FCLayer:
 
     def getDeltas(self):
         return self.deltas
+
+    def error(self, outputValues, expectedValues):
+        """
+
+        :param outputValues:
+        :param expectedValues:
+        :return: Cross Entropy Error
+        """
+        # Creates an array of 0 with the length of outputValues
+        expectedValue = np.zeros(len(outputValues))
+        #  Adds a 1 in the position of the expected Value
+        expectedValue[expectedValues.astype(int) - 1] += 1
+        log = np.log(outputValues)
+        #  Compute Error
+        error = -np.dot(expectedValue, log)
+        print "the error is " + str(error)
+        return error
