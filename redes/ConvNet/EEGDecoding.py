@@ -83,7 +83,10 @@ class EEGDecoding:
             for e in range(eegData.shape[1]):  # number of events
                 self.ConvNetwork.training(trainDataSet[s, e, :, :], trainLabels[s, e], learningRate=0.05)
 
-                # Dame una learning Curve
+        for s in range(eegData.shape[0]):  # number of subjects
+            for e in range(eegData.shape[1]):  # number of events
+                self.ConvNetwork.getError(trainDataSet[s, e, :, :], trainLabels[s, e])
+                self.ConvNetwork.learningCurve()  # Dame una learning Curve
 
     def test(self, eegData, labels):
         """

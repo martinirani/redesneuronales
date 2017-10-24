@@ -1,5 +1,6 @@
 import numpy as np
 import time
+import matplotlib.pyplot as plt
 
 
 class ConvNet:
@@ -185,8 +186,15 @@ class ConvNet:
     def confusalMatrix(self, outputValues, labels):
         pass
 
-    def learningCurve(self, testInputValues, labels):
-        pass
+    def getError(self, someInputValues, labels):
+        self.errorpoints = []
+        outputValues = self.forward(someInputValues)
+        self.errorpoints.append(self.aFCLayer[self.numberOfFCLayers - 1].error(outputValues, labels))
+
+    def learningCurve(self):
+        plt.plot(self.errorpoints)
+        plt.show()  # plots learning curve
+
 
 class Conv2DLayer:
 
@@ -232,6 +240,7 @@ class Conv2DLayer:
             outputWidth = (self.inputShape[3] + 2 * self.zeroPadding - (self.kernelSize[1]) / self.stride[1] + 1)
 
             self.outputValues = np.zeros((self.inputShape[0], self.numberOfFilters, outputHeight, outputWidth))
+            self.outputShape = self.outputValues.shape
 
     def forward(self, someInputs):
 
@@ -247,6 +256,10 @@ class Conv2DLayer:
 
         if self.spaceConv is True:
             someInputs = self.SpaceConvMatrixTranspose(someInputs)
+            if self.outputValues.shape == self.outputShape:
+                pass
+            else:
+                self.outputValues = np.transpose(self.outputValues, (3, 1, 2, 0))
         else:
             someInputs = np.reshape(someInputs, (self.inputShape))
 
@@ -340,14 +353,14 @@ class Conv2DLayer:
         :return self.deltaBiases
          """
 
+        print self.__nextLayer.getDeltas().shape
+        print self.outputValues.shape
+
         print "backpropagation in Convlayer"
 
         if self.__nextLayer.__class__.__name__ is 'FCLayer':
-            NNext = 1
-            KNext = 1
             WF = self.__nextLayer.numberOfNeuronsInLayer
-            HF = 1
-            dNext = np.reshape(self.__nextLayer.getDeltas(), (NNext, KNext, HF, WF))
+            dNext = np.reshape(self.__nextLayer.getDeltas(), (1, 1, 1, WF))
         else:
             dNext = self.__nextLayer.getDeltas()
 
@@ -360,17 +373,20 @@ class Conv2DLayer:
                     for h in range(self.outputValues.shape[2]):
                         for w in range(self.outputValues.shape[3]):
                             deltas_i = self.activationFunctionDerivative(self.outputValues)[n, nf, h, w] * dNext[
-                                0, 0, 0, nf]
+                                                                                                           :, :, :, nf]
                             self.deltas[n, nf, h, w] += deltas_i
+
+        elif self.__previousLayer is None:
+            for n in range(self.outputValues.shape[0]):
+                print self.activationFunctionDerivative(self.outputValues)[n]
+                print dNext
+                deltas_i = self.activationFunctionDerivative(self.outputValues)[n] * dNext
+                self.deltas[n] += deltas_i[0]
 
         else:
             for n in range(self.outputValues.shape[0]):
-                for nf in range(self.numberOfFilters):
-                    for h in range(self.outputValues.shape[2]):
-                        for w in range(self.outputValues.shape[3]):
-                            deltas_i = self.activationFunctionDerivative(self.outputValues)[n, nf, h, w] * \
-                                       dNext[n, nf, h, w]
-                            self.deltas[n, nf, h, w] += deltas_i
+                deltas_i = self.activationFunctionDerivative(self.outputValues)[n] * dNext
+                self.deltas[n] += deltas_i[n]
 
         print "shape of delta is " + str(self.deltas.shape)
         print self.deltas.shape
@@ -428,8 +444,14 @@ class Conv2DLayer:
         :return self.weights: updated weights
         :return self.bias: updated biases
         """
+        print "we are now updating parameters"
         self.weights -= learningRate * (self.deltaWeights * self.weights)
         self.bias -= learningRate * self.deltaBiases
+
+        if self.__nextLayer is None:
+            return self.weights, self.bias
+        else:
+            self.__nextLayer.updateParams(learningRate)
 
     def elu(self, outputValues, alpha):
         self.outputs = np.maximum(outputValues, 0) + (alpha * (np.exp(np.minimum(outputValues, 0)) - 1))
@@ -570,6 +592,9 @@ class PoolLayer:
             return self.deltas
         else:
             return self.__previousLayer.backpropagation()
+
+    def updateParams(self, learningRate):
+        return self.__nextLayer.updateParams(learningRate)
 
     def nextLayer(self, aLayer):
         self.__nextLayer = aLayer
@@ -717,7 +742,7 @@ class FCLayer:
                     self.deltas = np.dot(weightsNextLayer.T, deltasNextLayer)
                     return self.__previousLayer.backpropagation()
 
-    def updateParameters(self, someInputs, learningRate):
+    def updateParams(self, learningRate):
         """
 
         :param someInputs:
@@ -726,27 +751,37 @@ class FCLayer:
         """
 
         if self.firstLayer is True:
+
+            someInputs = self.__previousLayer.outcome.reshape(self.numberOfInputs)
+
+            print self.deltaWeights.shape
             self.deltaBiases = learningRate * self.deltas
-            self.deltaWeights = learningRate * self.deltas * someInputs
+
+            for nn in range(self.numberOfNeuronsInLayer):
+                self.deltaWeights[nn, :] = learningRate * self.deltas[nn] * someInputs
 
             self.weights += self.deltaWeights
             self.biases += self.deltaBiases
 
-            self.__nextLayer.updateParameters(self.outputValues, learningRate)
+            self.__nextLayer.updateParams(learningRate)
 
         elif self.firstLayer is not True and self.outputLayer is not True:
+
             self.deltaBiases = learningRate * self.deltas
-            self.deltaWeights = learningRate * self.deltas * someInputs
+            for nn in range(self.numberOfNeuronsInLayer):
+                self.deltaWeights = learningRate * self.deltas[nn] * self.__previousLayer.outputValues,
 
             self.weights += self.deltaWeights
             self.biases += self.deltaBiases
 
-            self.__nextLayer.updateParameters(self.outputValues, learningRate)
+            self.__nextLayer.updateParams(self.outputValues, learningRate)
 
         elif self.outputLayer is True:
 
             self.deltaBiases = learningRate * self.deltas
-            self.deltaWeights = learningRate * self.deltas * someInputs
+
+            for nn in range(self.numberOfNeuronsInLayer):
+                self.deltaWeights = learningRate * self.deltas[nn] * self.__previousLayer.outputValues
 
             self.weights += self.deltaWeights
             self.biases += self.deltaBiases
