@@ -246,19 +246,12 @@ class Conv2DLayer:
         Arguments:
 
         :param inputShape: Input dimensions [numberOfInput, numberOfInputChannels, Heigth, Width]
-        :type inputShape: np.array
         :param kernelSize: Kernel dimensions [Width, Heigth]
-        :type kernelSize: np.array
         :param numberOfFilters: number of Kernels used in the Layer
-        :type numberOfFilters: int
         :param stride: Stride of the convolution
-        :type stride: np.array of dimensions [Heigth stride, Width stride]
         :param activationFunction: activation Function of the layer
-        :type activationFunction: string - 'sigmoid', 'elu', 'relu'
         :param alpha: alpha value for elu activation Function
-        :type alpha: int value
         :param zeroPadding: Zero padding added to both sides of the input
-        :type zeroPadding: int
         """
         self.__dict__.update(locals())
         del self.self
@@ -288,9 +281,7 @@ class Conv2DLayer:
 
         Arguments:
         :param someInputs: array of dimensions [numberOfInputs, inputChannels, Height, Weight]
-        :type someInputs: np.array
         :return OutputValues: array of dimensions [numberOfOutputs, outputChannels, Height, Weight]
-        :type OutputValues: np.array
         """
 
         if self.spaceConv is True:
@@ -381,7 +372,6 @@ class Conv2DLayer:
         backward pass of Conv layer.
 
         :param deltasNext: derivatives from next layer of shape (N, K, HF, WF)
-        :type deltasNext: np.array
 
         :return self.deltaWeights
         :return self.deltaBiases
@@ -469,8 +459,8 @@ class Conv2DLayer:
         :return self.bias: updated biases
         """
         # print "we are now updating parameters"
-        self.weights -= learningRate * (self.deltaWeights * self.weights)
-        self.bias -= learningRate * self.deltaBiases
+        self.weights += learningRate * (self.deltaWeights * self.weights)
+        self.bias += learningRate * self.deltaBiases
 
         if self.__nextLayer is None:
             return self.weights, self.bias
@@ -514,11 +504,7 @@ class Conv2DLayer:
         return self.deltas
 
     def SpaceConvMatrixTranspose(self, someInputValues):
-        """
 
-        :param someInputValues:
-        :return:
-        """
         transposedValues = np.transpose(someInputValues, (3, 1, 0, 2))
         return transposedValues
 
@@ -735,7 +721,7 @@ class FCLayer:
                 if self.__previousLayer is None:
                     weightsNextLayer = self.__nextLayer.getWeights()
                     deltasNextLayer = self.__nextLayer.getDeltas()
-                    self.deltas = np.dot(weightsNextLayer.T, deltasNextLayer)
+                    self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
                     return self.deltas
                 else:
                     weightsNextLayer = self.__nextLayer.getWeights()
@@ -851,7 +837,6 @@ class FCLayer:
         return self.outputs
 
     def softmax(self, outputValues):
-        outputValues = outputValues.astype(np.float64)
         exps = np.exp(outputValues - np.max(outputValues))
         self.outputs = exps / np.sum(exps)
         return self.outputs
@@ -873,10 +858,9 @@ class FCLayer:
         expectedValue = np.zeros(len(outputValues))
         #  Adds a 1 in the position of the expected Value
         expectedValue[expectedValues.astype(int) - 1] += 1
-        outputValues = outputValues.astype(np.float32)
         log = np.log(outputValues)
         #  Compute Error
-        error = -np.dot(expectedValue, log)
+        error = - (1.0 / len(outputValues)) * np.dot(expectedValue, log)
         self.errorlist.append(error)
         # print self.errorlist
         # print outputValues
