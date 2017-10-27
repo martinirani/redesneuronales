@@ -1,7 +1,7 @@
 import numpy as np
 import time
 import matplotlib.pyplot as plt
-
+import math
 
 class ConvNet:
 
@@ -36,18 +36,18 @@ class ConvNet:
         timeInputShape = (inputChannels, 1, 1, inputTimeLength)
         timeKernelSize = (1, filterTimeLength)
         self.timeConvLayer = Conv2DLayer(timeInputShape, timeKernelSize, numberOfTimeFilters, stride=(1, 1),
-                                         zeroPadding=0, activationFunction='elu', alpha=1)
+                                         zeroPadding=0, activationFunction='relu', alpha=1)
 
         # Spatial Convolution
-        print "initializing convolution layer over space"
+        # print "initializing convolution layer over space"
         spaceInputShape = (self.timeConvLayer.outputValues.shape[3], numberOfTimeFilters, inputChannels, 1)
         spaceKernelSize = (inputChannels, 1)
         self.spaceConvLayer = Conv2DLayer(spaceInputShape, spaceKernelSize, numberOfSpaceFilters,
                                           stride=(convStride, 1),
-                                          zeroPadding=0, activationFunction='elu', alpha=1, spaceConv=True)
+                                          zeroPadding=0, activationFunction='relu', alpha=1, spaceConv=True)
 
         # First pool Layer
-        print "intializing first pool layer"
+        # print "intializing first pool layer"
 
         poolInputShape_1 = (1, numberOfSpaceFilters, 1, self.timeConvLayer.outputValues.shape[3])
         poolKernelSize_1 = (1, poolTimeLength)
@@ -55,29 +55,29 @@ class ConvNet:
 
         # 2. Second Conv-Pool Block
 
-        print "initializing second convolutional layer"
+        # print "initializing second convolutional layer"
 
         convInputShape_2 = (1, numberOfSpaceFilters,
                             self.poolLayer_1.outputValues.shape[2], self.poolLayer_1.outputValues.shape[3])
         kernelSizeConv_2 = (1, filterLength2)
         self.convLayer_2 = Conv2DLayer(convInputShape_2, kernelSizeConv_2, numberOfFilters2, stride=(1, convStride),
-                                       zeroPadding=0, activationFunction='elu', alpha=1)
+                                       zeroPadding=0, activationFunction='relu', alpha=1)
 
-        print "intializing second pool layer"
+        # print "intializing second pool layer"
         poolInputShape_2 = (
         1, numberOfFilters2, self.convLayer_2.outputValues.shape[2], self.convLayer_2.outputValues.shape[3])
         poolKernelSize_2 = (1, poolTimeLength)
         self.poolLayer_2 = PoolLayer(poolInputShape_2, poolKernelSize_2, stride=(1, poolTimeStride))
 
         # 3. Third Conv-Pool Block
-        print "initializing third convolutional Layer"
+        # print "initializing third convolutional Layer"
         convInputShape_3 = (
         1, numberOfFilters2, self.poolLayer_2.outputValues.shape[2], self.poolLayer_2.outputValues.shape[3])
         kernelSizeConv_3 = (1, filterLength3)
         self.convLayer_3 = Conv2DLayer(convInputShape_3, kernelSizeConv_3, numberOfFilters3, stride=(1, convStride),
-                                       zeroPadding=0, activationFunction='elu', alpha=1)
+                                       zeroPadding=0, activationFunction='relu', alpha=1)
 
-        print "intializing third pool layer"
+        # print "intializing third pool layer"
         poolInputShape_3 = (
         1, numberOfFilters3, self.convLayer_3.outputValues.shape[2], self.convLayer_3.outputValues.shape[3])
         poolKernelSize_3 = (1, poolTimeLength)
@@ -85,12 +85,12 @@ class ConvNet:
 
 
         # 4. Fourth Conv Block
-        print "intializing fourth convolutional Layer"
+        # print "intializing fourth convolutional Layer"
         convInputShape_4 = (
             1, numberOfFilters3, self.poolLayer_3.outputValues.shape[2], self.poolLayer_3.outputValues.shape[3])
         kernelSizeConv_4 = (1, filterLength4)
         self.convLayer_4 = Conv2DLayer(convInputShape_4, kernelSizeConv_4, numberOfFilters4, stride=(1, convStride),
-                                       zeroPadding=0, activationFunction='elu', alpha=1)
+                                       zeroPadding=0, activationFunction='relu', alpha=1)
 
         # 5. Classification Layer
         self.numberOfFCLayers = numberOfFCLayers
@@ -103,7 +103,7 @@ class ConvNet:
                 inputShape_i = np.squeeze(self.convLayer_4.outputValues)
                 numberOfInputs = inputShape_i.size
 
-                print "initializing first full connected layer"
+                # print "initializing first full connected layer"
                 self.aFCLayer[layerIndex] = FCLayer(numberOfInputs,
                                                     numberOfNeuronsInLayer,
                                                     layerIndex,
@@ -112,7 +112,7 @@ class ConvNet:
                                                     firstLayer=True)
 
             elif 0 < layerIndex < (numberOfFCLayers - 1):
-                print "initializing second full connected layer"
+                # print "initializing second full connected layer"
 
                 self.aFCLayer[layerIndex] = FCLayer(numberOfNeuronsInLayer,
                                                     numberOfNeuronsInLayer,
@@ -121,7 +121,7 @@ class ConvNet:
                                                     activationFunction='softmax')
 
             else:
-                print "initializing ouput Layer"
+                # print "initializing ouput Layer"
                 self.aFCLayer[layerIndex] = FCLayer(numberOfNeuronsInLayer,
                                                     numberOfClasses,
                                                     layerIndex,
@@ -161,38 +161,77 @@ class ConvNet:
                 self.aFCLayer[layerIndex].nextLayer(None)
 
     def forward(self, someInputValues):
-        print "We are now in the forward step"
+        # print "We are now in the forward step"
         someInputValues -= np.mean(someInputValues)
         someInputValues /= np.std(someInputValues)
         self.timeConvLayer.forward(someInputValues)
 
     def backward(self, expectedValues):
-        print "We are now in the backward step"
+        # print "We are now in the backward step"
         return self.aFCLayer[self.numberOfFCLayers - 1].backpropagation(expectedValues)
 
     def updateParameters(self, learningRate):
         return self.timeConvLayer.updateParams(learningRate)
 
     def training(self, someInputValues, expectedValues, learningRate):
-        print "Training phase started"
+        # print "Training phase started"
         self.forward(someInputValues)
         self.backward(expectedValues)
         self.updateParameters(learningRate)
 
     def test(self, testInputValues, labels):
-        outputs = self.forward(testInputValues)
-        self.confusalMatrix(outputs, labels)
+        self.forward(testInputValues)
+        outputs = self.aFCLayer[self.numberOfFCLayers - 1].errorlist
+        convArray = self.getConfMat(outputs, labels)
+        self.confusalMatrix(convArray)
 
-    def confusalMatrix(self, outputValues, labels):
-        pass
+    def getConfMat(self, outputs, labels):
+        convArray = np.zeros(4, 4)
 
-    def getError(self, someInputValues, labels):
-        self.errorpoints = []
-        outputValues = self.forward(someInputValues)
-        self.errorpoints.append(self.aFCLayer[self.numberOfFCLayers - 1].error(outputValues, labels))
+        for x in range(len(labels)):
+            if math.isnan(outputs[x]):
+                pass
+            else:
+                convArray[outputs[x], labels[x]] += 1
+
+        return convArray
+
+    def confusalMatrix(self, ConvArray):
+
+        norm_conf = []
+        figcount = 0
+        for i in ConvArray:
+            a = 0
+            tmp_arr = []
+            a = sum(i, 0)
+            for j in i:
+                tmp_arr.append(float(j) / float(a))
+            norm_conf.append(tmp_arr)
+
+        fig = plt.figure()
+        figcount += 1
+        plt.clf()
+        ax = fig.add_subplot(111)
+        ax.set_aspect(1)
+        res = ax.imshow(np.array(norm_conf), cmap=plt.cm.jet,
+                        interpolation='nearest')
+
+        width, height = ConvArray.shape
+
+        for x in list(range(width)):
+            for y in list(range(height)):
+                ax.annotate(str(ConvArray[x][y]), xy=(y, x),
+                            horizontalalignment='center',
+                            verticalalignment='center')
+
+        cb = fig.colorbar(res)
+        alphabet = '123456789LMNOPQRSTUVWXYZ'
+        plt.xticks(range(width), alphabet[:width])
+        plt.yticks(range(height), alphabet[:height])
+        plt.suptitle('Matriz de Confusion')
 
     def learningCurve(self):
-        plt.plot(self.errorpoints)
+        plt.plot(self.aFCLayer[self.numberOfFCLayers - 1].errorlist)
         plt.show()  # plots learning curve
 
 
@@ -263,9 +302,6 @@ class Conv2DLayer:
         else:
             someInputs = np.reshape(someInputs, (self.inputShape))
 
-        print "The shape of the Input is " + str(someInputs.shape)
-        print "aaaaand the ouput " + str(self.outputValues.shape)
-
         assert someInputs.shape == self.inputShape
 
         #  Adds Zero Padding
@@ -291,7 +327,7 @@ class Conv2DLayer:
                                                                                   'constant', constant_values=(0, 0))
 
         # Do the convolution
-        print "It's convolution, baby"
+        print "Performing convolution"
         timeA = time.time()
         for n in range(self.inputShape[0]):
             for cout in range(self.numberOfFilters):
@@ -313,9 +349,7 @@ class Conv2DLayer:
         if self.spaceConv is True:
             self.outputValues = np.transpose(self.outputValues, (3, 1, 2, 0))
 
-        print "Convolution took " + str(timeB - timeA) + " seconds"
-        print "outputs are in shape " + str(self.outputValues.shape)
-        print "getting outputs"
+        # print "Convolution took " + str(timeB - timeA) + " seconds"
 
         # Applies the activation function to the resultant matrix
         if self.activationFunction is 'relu':
@@ -353,9 +387,6 @@ class Conv2DLayer:
         :return self.deltaBiases
          """
 
-        print self.__nextLayer.getDeltas().shape
-        print self.outputValues.shape
-
         print "backpropagation in Convlayer"
 
         if self.__nextLayer.__class__.__name__ is 'FCLayer':
@@ -378,8 +409,6 @@ class Conv2DLayer:
 
         elif self.__previousLayer is None:
             for n in range(self.outputValues.shape[0]):
-                print self.activationFunctionDerivative(self.outputValues)[n]
-                print dNext
                 deltas_i = self.activationFunctionDerivative(self.outputValues)[n] * dNext
                 self.deltas[n] += deltas_i[0]
 
@@ -388,8 +417,7 @@ class Conv2DLayer:
                 deltas_i = self.activationFunctionDerivative(self.outputValues)[n] * dNext
                 self.deltas[n] += deltas_i[n]
 
-        print "shape of delta is " + str(self.deltas.shape)
-        print self.deltas.shape
+        # print "shape of delta is " + str(self.deltas.shape)
 
         if self.spaceConv is True:
             self.deltas = np.transpose(self.deltas, (3, 1, 2, 0))
@@ -403,10 +431,6 @@ class Conv2DLayer:
         # Compute delta Kernels
 
         deltaKernel = np.zeros(self.weights.shape)
-        print deltaKernel.shape
-        print self.inputShape
-
-        print self.deltas.shape
 
         for ninp in range(self.inputShape[0]):
             for nf in range(self.numberOfFilters):
@@ -444,7 +468,7 @@ class Conv2DLayer:
         :return self.weights: updated weights
         :return self.bias: updated biases
         """
-        print "we are now updating parameters"
+        # print "we are now updating parameters"
         self.weights -= learningRate * (self.deltaWeights * self.weights)
         self.bias -= learningRate * self.deltaBiases
 
@@ -533,18 +557,17 @@ class PoolLayer:
         :return self.outputValues: outputValues after pooling
         """
 
-        print "we are in a pooling layer"
+        print "Forward in pooling layer"
 
         self.someInputs = someInputs
-        print "The shape of the Input is " + str(self.someInputs.shape)
-        print "aaaaand the ouput " + str(self.outputValues.shape)
+        # print "The shape of the Input is " + str(self.someInputs.shape)
+        # print "and the ouput " + str(self.outputValues.shape)
 
         someInputs = np.reshape(someInputs, (self.inputShape))
 
-        print someInputs.shape
-        print self.inputShape
         assert someInputs.shape == self.inputShape
 
+        #  list with the posititon of the
         self.maxIdx = []
 
         # Do the pooling
@@ -573,20 +596,27 @@ class PoolLayer:
         delta: delta values of shape (N, D, H/factor, W/factor)
         """
 
-        print "backpropagation in pool layer"
+        print "Backpropagation in pool layer"
         deltasNext = self.__nextLayer.getDeltas()
         self.deltas = np.zeros(self.inputShape)
+
 
         # for para dar los valores del delta siguiente a los maximos
         idx = 0
         for n in range(self.inputShape[0]):
             for c in range(self.inputShape[1]):
+                nh = 0
                 for h in range(self.inputShape[2], self.inputShape[2] - self.kernelSize[0] + 1, self.stride[0]):
+                    nw = 0
                     for w in range(self.inputShape[3], self.inputShape[3] - self.kernelSize[1] + 1, self.stride[1]):
-                        self.deltas[n, c, self.maxIdx[idx][0], self.maxIdx[idx][1]] = deltasNext[
-                                                                                      n, c, h: h + self.kernelSize[0],
-                                                                                      w:w + self.kernelSize[1]]
+                        self.deltas[n, c, w + self.maxIdx[idx][0], h + self.maxIdx[idx][1]] = deltasNext[
+                                                                                              n, c,
+                                                                                              nh: nh + self.kernelSize[
+                                                                                                  0],
+                                                                                              nw:nw + self.kernelSize[
+                                                                                                  1]]
                         idx += 1
+
 
         if self.__previousLayer is None:
             return self.deltas
@@ -632,6 +662,7 @@ class FCLayer:
         self.deltaBias = np.zeros(self.biases.shape)
         self.dropoutVector = np.random.binomial(1, self.dropoutProbability,
                                                 size=numberOfNeuronsInLayer) / self.dropoutProbability
+        self.errorlist = []
 
     def forward(self, someInputs):
         """
@@ -639,9 +670,8 @@ class FCLayer:
         :param someInputs:
         :return:
         """
-        print "we are in a FC layer"
-        print "The number of the Input is " + str(self.numberOfInputs)
-
+        print "Forward in a FC layer"
+        # print "The number of the Input is " + str(self.numberOfInputs)
         someInputs = someInputs.reshape(self.numberOfInputs)
         z = np.dot(someInputs, self.weights.T) + self.biases
 
@@ -658,7 +688,6 @@ class FCLayer:
 
 
             if self.outputLayer is True:
-                print self.outputValues
                 return self.outputValues
             else:
                 return self.__nextLayer.forward(self.outputValues)
@@ -677,7 +706,6 @@ class FCLayer:
                 self.outputValues = self.softmax(z)
 
             if self.outputLayer is True:
-                print self.outputValues
                 return self.outputValues
             else:
                 return self.__nextLayer.forward(self.outputValues)
@@ -689,12 +717,13 @@ class FCLayer:
         :return:
         """
 
+        print "Backpropagation in fc layer"
+
         if self.trainMode is False:
 
             if self.outputLayer is True:
                 Error = self.error(self.outputValues, expectedValues)
                 self.deltas = np.multiply(Error, self.activationFunctionDerivative(self.outputValues))
-                print self.deltas
                 return self.__previousLayer.backpropagation(None)
 
             elif self.firstLayer is False and self.outputLayer is False:
@@ -702,7 +731,6 @@ class FCLayer:
                 deltasNextLayer = self.__nextLayer.getDeltas()
                 self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
                 return self.__previousLayer.backpropagation(None)
-
             else:
                 if self.__previousLayer is None:
                     weightsNextLayer = self.__nextLayer.getWeights()
@@ -753,8 +781,6 @@ class FCLayer:
         if self.firstLayer is True:
 
             someInputs = self.__previousLayer.outcome.reshape(self.numberOfInputs)
-
-            print self.deltaWeights.shape
             self.deltaBiases = learningRate * self.deltas
 
             for nn in range(self.numberOfNeuronsInLayer):
@@ -803,7 +829,6 @@ class FCLayer:
             return self.transferderivative
         if self.activationFunction is 'softmax':
             self.transferDerivative = outputValues * (1 - outputValues)
-            print self.transferDerivative
             return self.transferDerivative
 
 
@@ -826,7 +851,8 @@ class FCLayer:
         return self.outputs
 
     def softmax(self, outputValues):
-        exps = np.exp(outputValues) - np.max(outputValues)
+        outputValues = outputValues.astype(np.float64)
+        exps = np.exp(outputValues - np.max(outputValues))
         self.outputs = exps / np.sum(exps)
         return self.outputs
 
@@ -847,8 +873,14 @@ class FCLayer:
         expectedValue = np.zeros(len(outputValues))
         #  Adds a 1 in the position of the expected Value
         expectedValue[expectedValues.astype(int) - 1] += 1
+        outputValues = outputValues.astype(np.float32)
         log = np.log(outputValues)
         #  Compute Error
         error = -np.dot(expectedValue, log)
+        self.errorlist.append(error)
+        # print self.errorlist
+        # print outputValues
+        print "the expected value is " + str(expectedValues)
+        print "the output value is " + str(np.unravel_index(outputValues.argmax(), outputValues.shape)[0] + 1)
         print "the error is " + str(error)
         return error

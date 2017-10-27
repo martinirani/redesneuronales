@@ -81,7 +81,7 @@ class EEGDecoding:
 
         for s in range(eegData.shape[0]):  # number of subjects
             for e in range(eegData.shape[1]):  # number of events
-                self.ConvNetwork.training(trainDataSet[s, e, :, :], trainLabels[s, e], learningRate=0.05)
+                self.ConvNetwork.training(trainDataSet[s, e, :, :], trainLabels[s, e], learningRate=5)
 
         for s in range(eegData.shape[0]):  # number of subjects
             for e in range(eegData.shape[1]):  # number of events
