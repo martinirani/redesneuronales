@@ -21,8 +21,8 @@ class ConvNet:
                  numberOfFilters4=200,  # number of filters used in the forth convolution
                  filterLength4=3,
                  convStride=1,
-                 numberOfFCLayers=2,
-                 numberOfNeuronsInLayer=200,
+                 numberOfFCLayers=3,
+                 numberOfNeuronsInLayer=400,
                  dropoutProbability=0.5  # probability used for drop out
                  ):
 
@@ -476,12 +476,12 @@ class Conv2DLayer:
         return self.outputs
 
     def sigmoid(self, outputValues):
-        self.outputs = 1 / (1 + np.exp(-outputValues))
+        self.outputs = 1.0 / (1.0 + np.exp(-outputValues))
         return self.outputs
 
     def activationFunctionDerivative(self, outputValues):
         if self.activationFunction is 'sigmoid':
-            self.transferDerivative = outputValues * (1 - outputValues)
+            self.transferDerivative = outputValues * (1.0 - outputValues)
             return self.transferDerivative
         if self.activationFunction is 'relu':
             self.transferDerivative = 1. * (outputValues > 0)
@@ -504,9 +504,9 @@ class Conv2DLayer:
         return self.deltas
 
     def SpaceConvMatrixTranspose(self, someInputValues):
-
         transposedValues = np.transpose(someInputValues, (3, 1, 0, 2))
         return transposedValues
+
 
 class PoolLayer:
 
@@ -602,7 +602,6 @@ class PoolLayer:
                                                                                               nw:nw + self.kernelSize[
                                                                                                   1]]
                         idx += 1
-
 
         if self.__previousLayer is None:
             return self.deltas
@@ -715,7 +714,7 @@ class FCLayer:
             elif self.firstLayer is False and self.outputLayer is False:
                 weightsNextLayer = self.__nextLayer.getWeights()
                 deltasNextLayer = self.__nextLayer.getDeltas()
-                self.deltas = np.dot(weightsNextLayer, deltasNextLayer)
+                self.deltas = np.dot(weightsNextLayer.T, deltasNextLayer)
                 return self.__previousLayer.backpropagation(None)
             else:
                 if self.__previousLayer is None:
@@ -786,7 +785,7 @@ class FCLayer:
             self.weights += self.deltaWeights
             self.biases += self.deltaBiases
 
-            self.__nextLayer.updateParams(self.outputValues, learningRate)
+            self.__nextLayer.updateParams(learningRate)
 
         elif self.outputLayer is True:
 
@@ -805,7 +804,7 @@ class FCLayer:
         :return:
         """
         if self.activationFunction is 'sigmoid':
-            self.transferDerivative = outputValues * (1 - outputValues)
+            self.transferDerivative = outputValues * (1.0 - outputValues)
             return self.transferDerivative
         if self.activationFunction is 'relu':
             self.transferDerivative = 1. * (outputValues > 0)
@@ -814,7 +813,7 @@ class FCLayer:
             self.transferDerivative = (outputValues < 0) * self.elu(outputValues, self.alpha) + self.alpha
             return self.transferderivative
         if self.activationFunction is 'softmax':
-            self.transferDerivative = outputValues * (1 - outputValues)
+            self.transferDerivative = outputValues * (1.0 - outputValues)
             return self.transferDerivative
 
 
